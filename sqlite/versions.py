@@ -49,12 +49,15 @@ class Versions(object):
         return Workspace(self)
 
     def lineage(self):
-        stmt = "select versionId, parentId from %(qs_changesets)s;"
+        stmt = "select versionId, parentId, mergeId from %(qs_changesets)s;"
         res = self.cur.execute(stmt % self.ns)
 
         r = defaultdict(list)
-        for vid, pid in res:
-            r[pid].append((vid, [], r[vid]))
+        for vid, pid, mid in res:
+            e = (vid, [], r[vid])
+            r[pid].append(e)
+            if mid is not None:
+                r[mid].append(e)
 
         for pid, cl in r.iteritems():
             if len(cl) <= 1 and pid:
@@ -85,7 +88,9 @@ class Versions(object):
           select versionId, ts
             from %(qs_changesets)s
               join (select versionId from %(qs_changesets)s 
-                    except select parentId from %(qs_changesets)s)
+                    except select parentId from %(qs_changesets)s
+                    except select mergeId from %(qs_changesets)s
+                    )
                 using (versionId)
             order by ts desc;"""
         res = self.cur.execute(stmt % self.ns)

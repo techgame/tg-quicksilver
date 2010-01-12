@@ -36,6 +36,7 @@ if __name__=='__main__':
     if 1:
         r = qsh.lineage()
         pprint(r)
+
     if 0:
         with db:
             cs = Changeset(ws)
@@ -56,4 +57,14 @@ if __name__=='__main__':
                 print 'iterChildIds:'
                 for vid, state in pcs.iterChildIds():
                     print '  ', vid, state
+
+    if 0:
+        with db:
+            hi = qsh.headIds()
+            cs0 = Changeset(ws, next(hi))
+            cs1 = Changeset(ws, next(hi))
+            cs0.init()
+
+            cc = cs0.newChild()
+            cc.merge(cs1)
 

@@ -13,17 +13,26 @@ from .utils import OpBase
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Changeset(OpBase):
+    _initialized = False
     versionId = None
     parentId = None
     state = None
 
     mergeId = None
-    mergeState = 0
+    mergeFlags = None
 
     def __init__(self, host, versionId=None):
         self.setHost(host)
         if versionId:
             self.versionId = versionId
+
+    def __conform__(self, protocol):
+        print 'conform:', protocol
+        if protocol is sqlite3.PrepareProtocol:
+            return int(self)
+
+    def __int__(self):
+        return self.versionId
 
     def init(self, versionId=None):
         if versionId is None:
@@ -41,19 +50,27 @@ class Changeset(OpBase):
         for vals in res:
             for n,v in zip(cols, vals):
                 setattr(self, n, v)
+        self._initialized = True
         return self
 
     def _updateState(self, state):
-        stmt  = "update into %(qs_changesets)s \n" % self.ns
+        stmt  = "update %(qs_changesets)s \n" % self.ns
         stmt += "  set state=? where versionId=? "
         self.cur.execute(stmt, (state, self.versionId))
         self.state = state
 
-    def _updateMerge(self):
-        stmt  = "update into %(qs_changesets)s \n" % self.ns
-        stmt += "  set mergeId=?, mergeState=? \n"
+    def merge(self, mergeId=None, mergeFlags=None):
+        if mergeId is None:
+            mergeId = self.mergeId
+        mergeId = int(mergeId)
+        if mergeFlags is None:
+            mergeFlags = self.mergeFlags
+        stmt  = "update %(qs_changesets)s \n" % self.ns
+        stmt += "  set mergeId=?, mergeFlags=? \n"
         stmt += "  where versionId=? "
-        self.cur.execute(stmt, (self.mergeId, self.mergeState, self.versionId))
+        self.cur.execute(stmt, (mergeId, mergeFlags, self.versionId))
+        self.mergeId = mergeId
+        self.mergeFlags = mergeFlags
 
     def update(self, **kw):
         cols, data = self.splitColumnData(kw, ns.changeset)
@@ -110,6 +127,7 @@ class Changeset(OpBase):
         self.parentId = parentId
         self.state = state
         self.ts = ts
+        self._initialized = True
 
     def newVersionId(self, parentId):
         h = hashlib.sha1()
