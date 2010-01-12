@@ -16,11 +16,14 @@ class Workspace(object):
     temporary = False
 
     def __init__(self, host, wsid=None):
-        self.ns = host.ns.copy()
+        self.setHost(host)
         self.wsid = wsid or 42 #id(self) # TODO
-        self.host = host
-        self.conn = host.conn
         self._initSchema()
+
+    def setHost(self, host):
+        self.ns = host.ns.copy()
+        self.conn = host.conn
+        self.cur = host.cur
 
     def _initSchema(self):
         schema = self.Schema(self.ns, self)
@@ -65,27 +68,29 @@ class Workspace(object):
     def getRevId(self, create=True):
         r = self._revId
         if r is None and create:
-            r = self.newChangeset();#TODO
-            self._revId = r
+            cs = self.newChangeset()
+            self._revId = cs.versionId
         return r
     def setRevId(self, revId):
         self._revId = revId
     revId = property(getRevId, setRevId)
 
     def write(self, oid, **data):
-        revId = 360 # TODO: replace
-        op = WriteRevisionOp(self, oid, revId)
+        op = WriteRevisionOp(self, oid, self.revId)
         return op.writeRev(data)
+
+    def newChangeset(self):
+        cs = self.csParent.newChild()
+        self.cs = cs 
+        return cs
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class WriteRevisionOp(OpBase):
     def __init__(self, host, oid, revId):
-        ns = host.ns
+        self.setHost(host)
         if oid is None:
-            oid = ns.newOid()
-        self.ns = ns
-        self.cur = host.conn.cursor()
+            oid = self.ns.newOid()
         self.oid = oid
         self.revId = revId
 

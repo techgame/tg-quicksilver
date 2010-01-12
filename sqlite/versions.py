@@ -2,6 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+from collections import defaultdict
 import sqlite3
 
 from .utils import Namespace
@@ -20,7 +21,6 @@ class Versions(object):
         ('tags', 'TEXT default null'),
         ]
     ns.changeset = [
-        ('ts',  'TIMESTAMP default CURRENT_TIMESTAMP'),
         ('who', 'text default null'),
         ('node', 'text default null'),
         ('note', 'text default null'),
@@ -48,22 +48,56 @@ class Versions(object):
     def workspace(self):
         return Workspace(self)
 
+    def lineage(self):
+        stmt = "select versionId, parentId from %(qs_changesets)s;"
+        res = self.cur.execute(stmt % self.ns)
+
+        r = defaultdict(list)
+        for vid, pid in res:
+            r[pid].append((vid, [], r[vid]))
+
+        for pid, cl in r.iteritems():
+            if len(cl) <= 1 and pid:
+                continue
+
+            for (vid, ll, bl) in cl:
+                while len(bl) == 1:
+                    v = bl[0]
+                    ll.append(v[0])
+                    ll.extend(v[1])
+                    bl[:] = v[2]
+
+        return r[None]
+
 #class VersionsView(object):
-    def headVersions(self):
-        res = self.cur.execute(
-                "select unique versionId from %(qs_changesets)s \n"
-                "  except select parentId from %(qs_changesets)s;")
+    def rootIds(self, incTS=False):
+        stmt = """\
+          select versionId, ts
+            from %(qs_changesets)s
+              where parentId is null
+            order by ts desc;"""
+        res = self.cur.execute(stmt % self.ns)
+        if incTS: return iter(res)
+        else: return (e[0] for e in res)
+
+    def headIds(self, incTS=False):
+        stmt = """\
+          select versionId, ts
+            from %(qs_changesets)s
+              join (select versionId from %(qs_changesets)s 
+                    except select parentId from %(qs_changesets)s)
+                using (versionId)
+            order by ts desc;"""
+        res = self.cur.execute(stmt % self.ns)
+        if incTS: return iter(res)
+        else: return (e[0] for e in res)
+
+    def orphanIds(self):
+        res = self.cur.execute("""\
+            select distinct parentId from %(qs_changesets)s 
+                where parentId not null
+                except select versionId from %(qs_changesets)s
+            ;""" % self.ns)
         return res
 
-    def rootVersions(self):
-        res = self.cur.execute(
-                "select versionId from %(qs_changesets)s \n"
-                "  where parentId=null")
-        return res
-
-    def orphanVersions(self):
-        res = self.cur.execute(
-                "select unique parentId from %(qs_changesets)s \n"
-                "  except select versionId from %(qs_changesets)s;")
-        return res
 

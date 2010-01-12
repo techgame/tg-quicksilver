@@ -3,6 +3,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import uuid
+import hashlib
 import itertools
 import sqlite3
 
@@ -92,9 +93,11 @@ class VersionSchema(object):
         self.cur.execute("""\
             create table if not exists %(qs_changesets)s (
               versionId INTEGER primary key on conflict fail,
+              fullVersionId TEXT,
               state TEXT,
+              ts TIMESTAMP,
 
-              parentId INTEGER not null,
+              parentId INTEGER,
               mergeId INTEGER,
               mergeFlags TEXT,
 

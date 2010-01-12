@@ -9,6 +9,9 @@
 
 class HostDataView(object):
     def __init__(self, host):
+        self.setHost(host)
+
+    def setHost(self, host):
         self.cur = host.cur
         self.ns = host.ns
 
@@ -60,4 +63,8 @@ def splitColumnData(kwData, columns):
 
 class OpBase(object):
     splitColumnData = staticmethod(splitColumnData)
+
+    def setHost(self, host):
+        self.cur = host.cur
+        self.ns = host.ns
 

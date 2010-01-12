@@ -2,6 +2,10 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import uuid
+import hashlib
+from datetime import datetime
+from struct import pack, unpack
 from .utils import OpBase
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -16,18 +20,28 @@ class Changeset(OpBase):
     mergeId = None
     mergeState = 0
 
-    def initFrom(self, versionId):
+    def __init__(self, host, versionId=None):
+        self.setHost(host)
+        if versionId:
+            self.versionId = versionId
+
+    def init(self, versionId=None):
+        if versionId is None:
+            versionId = self.versionId
+            if versionId is None:
+                raise ValueError("Not possible to init changeset from a null versionId")
+
         stmt  = "select * from %(qs_changesets)s \n" % self.ns
         stmt += "  where versionId=?"
         res = self.cur.execute(stmt, (versionId,))
-        for e in res:
-            print e
+        print 'init:', versionId
 
-    def _createVersion(self, state='new'):
-        stmt  = "insert into %(qs_changesets)s \n" % self.ns
-        stmt += "  (versionId, parentId, state) values (?,?,?)"
-        self.cur.execute(stmt, (self.versionId, self.parentId, state))
-        self.state = state
+        cols = [e[0] for e in res.description]
+        ciRange = range(len(cols))
+        for vals in res:
+            for n,v in zip(cols, vals):
+                setattr(self, n, v)
+        return self
 
     def _updateState(self, state):
         stmt  = "update into %(qs_changesets)s \n" % self.ns
@@ -49,4 +63,64 @@ class Changeset(OpBase):
         stmt += "  set %s \n" % (', '.join('%s=?' for c in cols),)
         stmt += "  where versionId=? "
         self.cur.execute(stmt, data + [versionId])
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def iterParentIds(self, incSelf=False):
+        if incSelf:
+            yield self.versionId, self.state
+        vid = self.parentId
+
+        ex = self.cur.execute
+        stmt  = 'select parentId,state from %(qs_changesets)s where versionId=?'
+        stmt %= self.ns
+        while vid is not None:
+            for r in ex(stmt, (vid,)):
+                yield vid, r[1]
+                vid = r[0]
+                break
+            else: vid = None
+
+    def iterChildIds(self, incSelf=False):
+        stmt = 'select versionId, state from %(qs_changesets)s where parentId=?'
+        return self.cur.execute(stmt%self.ns, (self.versionId,))
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Changeset creation
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @classmethod
+    def new(klass, host):
+        return klass(host)
+
+    def newChild(self):
+        child = self.new(self)
+        child.createVersion(self.versionId)
+        return child
+
+    def createVersion(self, parentId, state='new'):
+        versionId, fullVersionId, ts = self.newVersionId(parentId)
+
+        stmt  = "insert into %(qs_changesets)s \n" % self.ns
+        stmt += "  (versionId, fullVersionId, parentId, state, ts) values (?,?,?,?,?)"
+        self.cur.execute(stmt, (versionId, fullVersionId, parentId, state, ts))
+
+        self.versionId = versionId
+        self.fullVersionId = fullVersionId
+        self.parentId = parentId
+        self.state = state
+        self.ts = ts
+
+    def newVersionId(self, parentId):
+        h = hashlib.sha1()
+        if parentId is None:
+            parentId = uuid.getnode()
+
+        h.update(pack('q', parentId))
+        ts = datetime.now()
+        h.update(ts.isoformat('T'))
+
+        versionId, = unpack('q', h.digest()[:8])
+        fullVersionId = h.hexdigest()
+        return versionId, fullVersionId, ts
 
