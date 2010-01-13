@@ -2,11 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import uuid
-import hashlib
-from datetime import datetime
-from struct import pack, unpack
-from .utils import OpBase
+from .utils import OpBase, IndexHasher
  
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -91,7 +87,6 @@ class Changeset(OpBase):
         return 'closed' in self.state
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 
     def updateState(self, state):
         stmt  = "update %(qs_changesets)s \n" % self.ns
@@ -210,18 +205,15 @@ class Changeset(OpBase):
         self._initialized = True
 
     def newVersionId(self, parentId):
-        h = hashlib.sha1()
         if parentId is None:
-            parentId = uuid.getnode()
+            parentId = self.getnode()
         else: parentId = int(parentId)
 
-        h.update(pack('q', parentId))
-        ts = datetime.now()
-        h.update(ts.isoformat('T'))
+        h = IndexHasher()
+        h.addInt(parentId)
+        h.addTimestamp()
 
-        versionId, = unpack('q', h.digest()[:8])
-        if versionId < 0:
-            versionId = -versionId
+        versionId = abs(h.asInt())
         fullVersionId = h.hexdigest()
-        return versionId, fullVersionId, ts
+        return versionId, fullVersionId, h.ts
 

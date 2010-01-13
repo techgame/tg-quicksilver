@@ -2,11 +2,10 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import uuid
-import hashlib
 import itertools
 import sqlite3
 
+from . import utils
 from .metadata import metadataView
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -144,20 +143,24 @@ class VersionSchema(object):
         else: oid = oid0
         return (oid, oid1)
 
-    def provisionNode(self, nodeId, nodeSpace, metaKey='nodeid_offset'):
-        meta = self.metadataView(metaKey)
-
-        oid0 = meta[nodeId]
+    def provisionNode(self, nodeId, nodeSpace, oidSpace, nodeTable):
+        oid0 = nodeTable[nodeId]
         if oid0 is not None: 
             return oid0
 
-        offsets = set(e[0] for e in meta)
-        offsets.add(0)
-        oid0 = 0
-        while oid0 in offsets:
-            oid0 = hash(oid0+nodeId) % nodeSpace
+        h = utils.IndexHasher()
+        h.addInt(nodeId)
+        h.addTimestamp()
 
-        meta[nodeId] = oid0
+        allOidBases = set(e[1] for e in nodeTable)
+        allOidBases.add(0)
+
+        while 1:
+            oid0 = (int(h) % nodeSpace) * oidSpace
+            if oid0 not in allOidBases:
+                break
+
+        nodeTable[nodeId] = oid0
         return oid0
 
     def initOidSpace(self, host, oidSpace=1<<36, nodeSpace=1<<27):
@@ -172,12 +175,12 @@ class VersionSchema(object):
 
         oidRoot = self.findOidRangeMax(0, oidSpace)[0]
 
-        nodeId = uuid.getnode()
-        oidNode = self.provisionNode(nodeId, nodeSpace)
+        nodeId = utils.getnode()
+        oidNode = self.provisionNode(nodeId, nodeSpace, oidSpace, meta['nodeid_offset'])
         oidNode = self.findOidRangeMax(oidNode, oidSpace)[0]
 
         ns = self.ns
-        ns.nodeId  = nodeId
+        ns.nodeId = nodeId
         ns.newRootOid = itertools.count(oidRoot).next
         ns.newNodeOid = itertools.count(oidNode).next
         ns.newOid = ns.newNodeOid

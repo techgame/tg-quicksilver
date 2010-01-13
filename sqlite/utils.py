@@ -2,10 +2,17 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import uuid
+import hashlib
+import struct
+from datetime import datetime
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+getnode = uuid.getnode
+
 
 class HostDataView(object):
     def __init__(self, host):
@@ -63,6 +70,7 @@ def splitColumnData(kwData, columns):
 
 class OpBase(object):
     splitColumnData = staticmethod(splitColumnData)
+    getnode = staticmethod(getnode)
 
     def setHost(self, host):
         self.cur = host.cur
@@ -72,4 +80,44 @@ class OpBase(object):
 
 class QuicksilverError(Exception):
     pass
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class IndexHasher(object):
+    def __init__(self, factory=hashlib.sha1):
+        self._h = factory()
+
+    def update(self, v):
+        return self._h.update(v)
+
+    def digest(self):
+        return self._h.digest()
+    def hexdigest(self):
+        return self._h.hexdigest()
+
+    def addInt(self, v):
+        v = self.pack('q', v)
+        return self.update(v)
+    def addUInt(self, v):
+        v = self.pack('Q', v)
+        return self.update(v)
+    def addTimestamp(self, ts=None):
+        if ts is None:
+            ts = self.now()
+        self.ts = ts
+        return self.update(ts.isoformat('T'))
+
+    def asInt(self):
+        v = self._h.digest()[:8]
+        return self.unpack('q', v)[0]
+    def asUInt(self):
+        v = self._h.digest()[:8]
+        return self.unpack('Q', v)[0]
+
+    def __int__(self): return self.asInt()
+    def __long__(self): return self.asInt()
+
+    pack = staticmethod(struct.pack)
+    unpack = staticmethod(struct.unpack)
+    now = staticmethod(datetime.now)
 
