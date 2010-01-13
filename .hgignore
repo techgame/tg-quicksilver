@@ -3,10 +3,11 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 syntax: glob 
+*.qag
+*.db
 
 syntax: regexp 
-^objProxy/build/.*
-^sqlite/test/.*\.db
+.*/oow/.*
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Generally useful ignore configurations
