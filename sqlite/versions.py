@@ -73,6 +73,6 @@ class Versions(ChangesetCollectionView):
     def __exit__(self, excType, exc, tb):
         return self.conn.__exit__(excType, exc, tb)
 
-    def workspace(self):
-        return Workspace(self)
+    def workspace(self, *args, **kw):
+        return Workspace(self, *args, **kw)
 

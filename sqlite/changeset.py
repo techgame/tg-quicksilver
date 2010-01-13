@@ -17,6 +17,7 @@ class Changeset(OpBase):
     versionId = None
     parentId = None
     state = None
+    branch = None
     ts = None
 
     mergeId = None
@@ -81,6 +82,16 @@ class Changeset(OpBase):
             else: arg = int(arg)
 
         return klass(host, arg)
+
+
+    def isChangesetOpen(self):
+        return not self.isChangesetClosed()
+    def isChangesetClosed(self):
+        self.init()
+        return 'closed' in self.state
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
     def updateState(self, state):
         stmt  = "update %(qs_changesets)s \n" % self.ns
@@ -175,12 +186,14 @@ class Changeset(OpBase):
     def new(klass, host, versionId=None):
         return klass(host, versionId)
 
-    def newChild(self):
+    def newChild(self, branch=None):
+        if branch is None:
+            branch = self.branch
         child = self.new(self)
-        child.createVersion(self.versionId)
+        child.createVersion(self.versionId, branch)
         return child
 
-    def createVersion(self, parentId, state='new'):
+    def createVersion(self, parentId, branch=None, state='new'):
         if parentId is not None:
             parentId = int(parentId)
         versionId, fullVersionId, ts = self.newVersionId(parentId)

@@ -22,15 +22,17 @@ if __name__=='__main__':
     print 'orphan:', list(qsh.orphanIds())
 
     ws = qsh.workspace()
-    cs = ws.checkout(qsh.head())
+    #ws.cs = None
+    ws.checkout()
+    #cs = ws.checkout(qsh.head())
 
     for e in ws.readAll():
         #print e
         print e.oid, e.payload, str(e.payload).decode('hex')
 
-    if 0:
+    if 1:
         oid = None
-        oid = 42
+        #oid = 42
         print
         print "adding new thingy at:", oid
         print

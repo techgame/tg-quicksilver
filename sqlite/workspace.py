@@ -5,6 +5,7 @@
 import sqlite3
 
 from .utils import OpBase, HostDataView, QuicksilverError
+from .metadata import metadataView
 from .workspaceSchema import WorkspaceSchema
 from .changeset import Changeset
 
@@ -25,6 +26,7 @@ class Workspace(HostDataView):
         self.setHost(host)
         self.wsid = wsid
         self._initSchema()
+        self._initMeta()
 
     def setHost(self, host):
         self.ns = host.ns.copy()
@@ -35,6 +37,22 @@ class Workspace(HostDataView):
         schema = self.Schema(self.ns, self)
         schema.initStore(self.conn)
 
+    def _initMeta(self):
+        cs = self.getMetaChangeset()
+        print 'cs:', cs
+        if cs is None:
+            return
+
+        cs.init()
+        if cs.isChangesetClosed():
+            self.csCheckout = cs
+            self.csWorking = None
+        else:
+            self.csCheckout = cs.csParent
+            self.csWorking = cs
+
+    metadataView = metadataView
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     csCheckout = None
@@ -43,16 +61,62 @@ class Workspace(HostDataView):
     def getCSWorking(self, create=True):
         cs = self._csWorking
         if cs is None and create:
-            cs = self.csCheckout.newChild()
+            csParent = self.csCheckout
+            if csParent is None:
+                csParent = self._changesetFromArg(self, None)
+
+            cs = csParent.newChild()
             self._csWorking = cs
+            self.updateMetaChangeset()
         return cs
-    csWorking = property(getCSWorking)
+    def setCSWorking(self, cs):
+        self._csWorking = cs
+    csWorking = property(getCSWorking, setCSWorking)
+
+    def getCS(self):
+        r = self._csWorking 
+        if r is None:
+            r = self.csCheckout
+        return r
+    def setCS(self, cs):
+        self.checkCommited()
+        if self.csCheckout is not None:
+            self.clearWorkspace()
+        cs = self._changesetFromArg(self, cs)
+        self.csCheckout = cs
+    cs = property(getCS, setCS)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def getMetaChangeset(self):
+        wsMeta = self.metadataView("workspaces")
+        cs = wsMeta.getAt(self.wsid, None)
+        if cs is not None:
+            return self._changesetFromArg(self, cs)
+    def setMetaChangeset(self, cs, force=False):
+        if self.temporary and not force:
+            return False
+
+        wsMeta = self.metadataView("workspaces")
+        if cs is not None:
+            wsMeta[self.wsid] = int(cs)
+        else: del wsMeta[self.wsid]
+        return True
+    metaChangeset = property(getMetaChangeset, setMetaChangeset)
+
+    def updateMetaChangeset(self):
+        cs = self.cs
+        self.setMetaChangeset(cs)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     _changesetFromArg = staticmethod(Changeset.fromArg)
-    def checkout(self, cs):
-        cs = self._changesetFromArg(self, cs)
+    def checkout(self, cs=False):
+        self.checkCommited()
+
+        if cs is False:
+            cs = self.csCheckout
+        else: cs = self._changesetFromArg(self, cs)
 
         self.clearWorkspace()
         versions = [v for v,s in cs.iterLineage() if s != 'mark']
@@ -60,6 +124,7 @@ class Workspace(HostDataView):
         self.fetchVersions(versions, 'ignore')
 
         self.csCheckout = cs
+        self.updateMetaChangeset()
         self._versionsToMark = versions
         return cs
 
@@ -74,10 +139,14 @@ class Workspace(HostDataView):
                     ((v,) for v in iterVersions))
         return res
 
-    def clearWorkspace(self):
+    def checkCommited(self, fail=True):
         csw = self.getCSWorking(False)
-        if csw is not None:
-            raise WorkspaceError("Uncommited changeset")
+        if csw is None: return True
+        if not fail: return False
+        raise WorkspaceError("Uncommited changeset")
+
+    def clearWorkspace(self):
+        self.checkCommited()
 
         ns = self.ns
         ex = self.cur.execute
@@ -88,24 +157,27 @@ class Workspace(HostDataView):
         ex("delete from %(ws_version)s;"%ns)
 
     def revertAll(self):
-        csWorking = self.getCSWorking(False)
-        if csWorking is not None:
-            csWorking.updateState('reverted')
+        cs = self.getCSWorking(False)
+        if cs is not None:
+            cs.revert()
+        self.csWorking = None
         self.cur.execute("delete from %(ws_log)s;")
-        self._csWorking = None
         self.clearWorkspace()
+        self.updateMetaChangeset()
 
     def commit(self, **kw):
-        csWorking = self.getCSWorking(False)
-        if csWorking is None:
+        cs = self.getCSWorking(False)
+        if cs is None:
             return False
         ns = self.ns
 
-        if kw: csWorking.update(kw)
-        csWorking.updateState('closed')
+        if kw: cs.update(kw)
+        cs.updateState('closed')
         self.cur.execute("delete from %(ws_log)s;" % ns)
-        self.csCheckout = csWorking
-        self._csWorking = None
+        self.csWorking = None
+        self.csCheckout = cs
+        self.updateMetaChangeset()
+
         self.conn.commit()
         return True
 

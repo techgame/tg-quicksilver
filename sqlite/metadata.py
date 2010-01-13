@@ -30,6 +30,16 @@ class MetadataView(HostDataView):
         update = '  values (?, ?, ?)'
         return self.cur.execute(stmt+update, (name, idx, value))
 
+    def delete(self, name):
+        return self.deleteAt(name, None, value)
+    def deleteAt(self, name, idx):
+        ex = self.cur.execute
+        stmt  = 'delete from %(qs_meta)s where name=?' % self.ns
+        if idx is not None: 
+            stmt += ' and idx=?'
+            return ex(stmt, (name, idx))
+        else: return ex(stmt, (name,))
+
     def default(self, name, value=None):
         return self.defaultAt(name, None, value)
     def defaultAt(self, name, idx, value=None):
@@ -62,6 +72,8 @@ class KeyedMetadataView(object):
         return self.getAt(None, default)
     def set(self, value):
         return self.setAt(None, value)
+    def delete(self):
+        return self.deleteAt(None, value)
     def default(self, value=None):
         return self.defaultAt(None, value)
 
@@ -69,6 +81,8 @@ class KeyedMetadataView(object):
         return self._view.getAt(self._name, key, default)
     def setAt(self, key, value):
         return self._view.setAt(self._name, key, value)
+    def deleteAt(self, key):
+        return self._view.deleteAt(self._name, key)
 
     def defaultAt(self, key, value=None):
         sentinal = object()
@@ -88,6 +102,10 @@ class KeyedMetadataView(object):
         if isinstance(key, slice):
             raise ValueError("KeyedMetadataView does not support assignment by slice")
         return self.setAt(key, value)
+    def __delitem__(self, key, value):
+        if isinstance(key, slice):
+            raise ValueError("KeyedMetadataView does not support delete by slice")
+        return self.delAt(key, value)
 
 
 def metadataView(host, key=None):
