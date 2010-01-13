@@ -7,7 +7,7 @@ import hashlib
 from datetime import datetime
 from struct import pack, unpack
 from .utils import OpBase
-
+ 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -17,6 +17,7 @@ class Changeset(OpBase):
     versionId = None
     parentId = None
     state = None
+    ts = None
 
     mergeId = None
     mergeFlags = None
@@ -24,17 +25,30 @@ class Changeset(OpBase):
     def __init__(self, host, versionId=None):
         self.setHost(host)
         if versionId:
-            self.versionId = versionId
+            self.versionId = int(versionId)
 
-    def __conform__(self, protocol):
-        print 'conform:', protocol
-        if protocol is sqlite3.PrepareProtocol:
-            return int(self)
+    def __repr__(self):
+        name = self.__class__.__name__
+        if not self._initialized:
+            return "<%s ref|%x>" % (name, self.versionId)
+        else:
+            return "<%s %s|%x at %s>" % (name, self.state, self.versionId, self.ts)
 
-    def __int__(self):
-        return self.versionId
+    def __cmp__(self, other): 
+        return cmp(self.versionId, other.versionId)
+        if isinstance(other, Changeset):
+            return cmp(self.versionId, other.versionId)
+        else:
+            return cmp(self.versionId, other)
+
+    def __hash__(self): return hash(self.versionId)
+    def __int__(self): return self.versionId
+    def __long__(self): return self.versionId
+    def __index__(self): return self.versionId
 
     def init(self, versionId=None):
+        if self._initialized:
+            return self
         if versionId is None:
             versionId = self.versionId
             if versionId is None:
@@ -43,7 +57,6 @@ class Changeset(OpBase):
         stmt  = "select * from %(qs_changesets)s \n" % self.ns
         stmt += "  where versionId=?"
         res = self.cur.execute(stmt, (versionId,))
-        print 'init:', versionId
 
         cols = [e[0] for e in res.description]
         ciRange = range(len(cols))
@@ -53,7 +66,23 @@ class Changeset(OpBase):
         self._initialized = True
         return self
 
-    def _updateState(self, state):
+    def isChangeset(self): return True
+    def asChangeset(self): return self 
+
+    @classmethod
+    def fromArg(klass, host, arg):
+        if arg is None: 
+            return klass(host)
+
+        if not isinstance(arg, (int, long)):
+            asCS = getattr(arg, 'asChangeset', None)
+            if asCS is not None:
+                return asCS()
+            else: arg = int(arg)
+
+        return klass(host, arg)
+
+    def updateState(self, state):
         stmt  = "update %(qs_changesets)s \n" % self.ns
         stmt += "  set state=? where versionId=? "
         self.cur.execute(stmt, (state, self.versionId))
@@ -72,9 +101,16 @@ class Changeset(OpBase):
         self.mergeId = mergeId
         self.mergeFlags = mergeFlags
 
-    def update(self, **kw):
-        cols, data = self.splitColumnData(kw, ns.changeset)
-        if kw: raise ValueError("Unknown keys: %s" % (kw.keys(),))
+    def update(self, data=None, **kw):
+        if data is not None: 
+            if kw:
+                data = dict(data)
+                data.update(kw)
+        else: data = kw
+
+        cols, data = self.splitColumnData(data, ns.changeset)
+        if data: 
+            raise ValueError("Unknown keys: %s" % (data.keys(),))
 
         stmt  = "update into %(qs_changesets)s \n" % self.ns
         stmt += "  set %s \n" % (', '.join('%s=?' for c in cols),)
@@ -83,7 +119,36 @@ class Changeset(OpBase):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    _csParent = False
+    def getCSParent(self, init=False):
+        r = self._csParent
+        if r is False:
+            r = self.parentId
+            if r is not None:
+                r = self.new(self, r)
+                if init: r.init()
+            self._csParent = r
+        return r
+    csParent = property(getCSParent)
+
+    _csMerge = None
+    def getCSMerge(self, init=False):
+        r = self._csMerge
+        if r is False:
+            r = self.mergeId
+            if r is not None:
+                r = self.new(self, r)
+                if init: r.init()
+            self._csMerge = r
+        return r
+    csMerge = property(getCSMerge)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def iterLineage(self):
+        return self.iterParentIds(True)
     def iterParentIds(self, incSelf=False):
+        self.init()
         if incSelf:
             yield self.versionId, self.state
         vid = self.parentId
@@ -107,8 +172,8 @@ class Changeset(OpBase):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def new(klass, host):
-        return klass(host)
+    def new(klass, host, versionId=None):
+        return klass(host, versionId)
 
     def newChild(self):
         child = self.new(self)
@@ -116,6 +181,8 @@ class Changeset(OpBase):
         return child
 
     def createVersion(self, parentId, state='new'):
+        if parentId is not None:
+            parentId = int(parentId)
         versionId, fullVersionId, ts = self.newVersionId(parentId)
 
         stmt  = "insert into %(qs_changesets)s \n" % self.ns
@@ -133,12 +200,15 @@ class Changeset(OpBase):
         h = hashlib.sha1()
         if parentId is None:
             parentId = uuid.getnode()
+        else: parentId = int(parentId)
 
         h.update(pack('q', parentId))
         ts = datetime.now()
         h.update(ts.isoformat('T'))
 
         versionId, = unpack('q', h.digest()[:8])
+        if versionId < 0:
+            versionId = -versionId
         fullVersionId = h.hexdigest()
         return versionId, fullVersionId, ts
 

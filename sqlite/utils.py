@@ -68,3 +68,8 @@ class OpBase(object):
         self.cur = host.cur
         self.ns = host.ns
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class QuicksilverError(Exception):
+    pass
+

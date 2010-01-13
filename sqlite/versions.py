@@ -2,19 +2,24 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-from collections import defaultdict
 import sqlite3
 
+import itertools
 from .utils import Namespace
 from .metadata import metadataView
 from .versionsSchema import VersionSchema
 from .workspace import Workspace
+from .changeset import Changeset
+from .changesetCollection import ChangesetCollectionView
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class Versions(object):
+sqlite3.register_adapter(Changeset, lambda cs: cs.versionId)
+sqlite3.register_adapter(Workspace, lambda ws: ws.workingId)
+
+class Versions(ChangesetCollectionView):
     ns = Namespace() # copied upon init
     ns.payload = [
         ('payload','BLOB'),
@@ -29,14 +34,32 @@ class Versions(object):
     Schema = VersionSchema
     metadataView = metadataView
 
-    def __init__(self, conn, name='objectStore'):
+    def __init__(self, db, name='objectStore'):
+        self._loadDatabase(db)
         self.ns = self.ns.branch(name=name)
         self.name = name
-        self.conn = conn
-        conn.isolation_level = 'DEFERRED'
-        self.cur = conn.cursor()
 
         self._initSchema()
+
+    conn = cur = None
+    def _loadDatabase(self, db):
+        if self.conn is not None:
+            raise RuntimeError("Database is already loaded")
+
+        if isinstance(db, basestring):
+            conn = sqlite3.connect(
+                    db, 
+                    isolation_level='DEFERRED',
+                    detect_types=sqlite3.PARSE_DECLTYPES,
+                    )
+        else:
+            db.executemany # ducktype test
+            conn = db
+            conn.isolation_level = 'DEFERRED'
+
+        conn.row_factory = sqlite3.Row
+        self.conn = conn
+        self.cur = conn.cursor()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -45,64 +68,11 @@ class Versions(object):
         schema.initStore(self.conn)
         schema.initOidSpace(self)
 
+    def __enter__(self):
+        return self.conn.__enter__()
+    def __exit__(self, excType, exc, tb):
+        return self.conn.__exit__(excType, exc, tb)
+
     def workspace(self):
         return Workspace(self)
-
-    def lineage(self):
-        stmt = "select versionId, parentId, mergeId from %(qs_changesets)s;"
-        res = self.cur.execute(stmt % self.ns)
-
-        r = defaultdict(list)
-        for vid, pid, mid in res:
-            e = (vid, [], r[vid])
-            r[pid].append(e)
-            if mid is not None:
-                r[mid].append(e)
-
-        for pid, cl in r.iteritems():
-            if len(cl) <= 1 and pid:
-                continue
-
-            for (vid, ll, bl) in cl:
-                while len(bl) == 1:
-                    v = bl[0]
-                    ll.append(v[0])
-                    ll.extend(v[1])
-                    bl[:] = v[2]
-
-        return r[None]
-
-#class VersionsView(object):
-    def rootIds(self, incTS=False):
-        stmt = """\
-          select versionId, ts
-            from %(qs_changesets)s
-              where parentId is null
-            order by ts desc;"""
-        res = self.cur.execute(stmt % self.ns)
-        if incTS: return iter(res)
-        else: return (e[0] for e in res)
-
-    def headIds(self, incTS=False):
-        stmt = """\
-          select versionId, ts
-            from %(qs_changesets)s
-              join (select versionId from %(qs_changesets)s 
-                    except select parentId from %(qs_changesets)s
-                    except select mergeId from %(qs_changesets)s
-                    )
-                using (versionId)
-            order by ts desc;"""
-        res = self.cur.execute(stmt % self.ns)
-        if incTS: return iter(res)
-        else: return (e[0] for e in res)
-
-    def orphanIds(self):
-        res = self.cur.execute("""\
-            select distinct parentId from %(qs_changesets)s 
-                where parentId not null
-                except select versionId from %(qs_changesets)s
-            ;""" % self.ns)
-        return res
-
 

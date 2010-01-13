@@ -95,6 +95,7 @@ class VersionSchema(object):
               versionId INTEGER primary key on conflict fail,
               fullVersionId TEXT,
               state TEXT,
+              branch TEXT,
               ts TIMESTAMP,
 
               parentId INTEGER,
