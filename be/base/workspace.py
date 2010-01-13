@@ -38,14 +38,14 @@ class WorkspaceBase(object):
         self.checkCommited()
         if self.csCheckout is not None:
             self.clearWorkspace()
-        cs = self._asChangeset(self, cs)
+        cs = self._asChangeset(cs)
         self.csCheckout = cs
     cs = property(getCS, setCS)
 
     def _createWorkingChangeset(self):
         csParent = self.csCheckout
         if csParent is None:
-            csParent = self._asChangeset(self, None)
+            csParent = self._asChangeset(None)
 
         cs = csParent.newChild()
         self._csWorking = cs
