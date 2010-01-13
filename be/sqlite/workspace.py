@@ -212,3 +212,15 @@ class Workspace(object):
         op = Ops.Remove(self)
         return op.perform(oid)
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def workspaceView(host, wsid='main'):
+    return Workspace(host, wsid)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ Register adaptors
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+sqlite3.register_adapter(Changeset, lambda cs: cs.versionId)
+sqlite3.register_adapter(Workspace, lambda ws: ws.cs.versionId)
+

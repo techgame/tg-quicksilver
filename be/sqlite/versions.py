@@ -4,35 +4,29 @@
 
 import sqlite3
 
-import itertools
-from .utils import Namespace
-from .metadata import metadataView
-from .versionsSchema import VersionSchema
+from ..base.versions import VersionsAbstract
 from .workspace import Workspace
-from .changeset import Changeset
-from .changesView import ChangesView
+
+from . import versionsSchema
+from . import metadata
+from . import changesView
+from . import workspace
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-sqlite3.register_adapter(Changeset, lambda cs: cs.versionId)
-sqlite3.register_adapter(Workspace, lambda ws: ws.cs.versionId)
+class Versions(VersionsAbstract):
+    ns = VersionsAbstract.ns.copy()
+    ns.payload = [('payload','BLOB')]
+    ns.changeset = []
 
-class Versions(ChangesView):
-    ns = Namespace() # copied upon init
-    ns.payload = [
-        ('payload','BLOB'),
-        ('tags', 'TEXT default null'),
-        ]
-    ns.changeset = [
-        ('who', 'text default null'),
-        ('node', 'text default null'),
-        ('note', 'text default null'),
-        ]
+    Schema = versionsSchema.VersionSchema
+    metadata = metadata.metadataView
+    versions = changesView.changesView
+    workspace = workspace.workspaceView
 
-    Schema = VersionSchema
-    metadataView = metadataView
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def __init__(self, db, name='objectStore'):
         self._loadDatabase(db)
@@ -73,6 +67,19 @@ class Versions(ChangesView):
     def __exit__(self, excType, exc, tb):
         return self.conn.__exit__(excType, exc, tb)
 
-    def workspace(self, *args, **kw):
-        return Workspace(self, *args, **kw)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ Example verisons extension with more columns
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class VersionsPlus(Versions):
+    ns = Versions.ns.copy()
+    ns.payload = [
+        ('payload','BLOB'),
+        ('tags', 'TEXT default null'),
+        ]
+    ns.changeset = [
+        ('who', 'text default null'),
+        ('node', 'text default null'),
+        ('note', 'text default null'),
+        ]
 

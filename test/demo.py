@@ -9,7 +9,6 @@ import datetime
 import sqlite3
 
 from TG.quicksilver.be.sqlite import Versions
-from TG.quicksilver.be.sqlite import Changeset
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Main 
@@ -18,9 +17,9 @@ from TG.quicksilver.be.sqlite import Changeset
 if __name__=='__main__':
     qsh = Versions('db_quicksilver.qag', 'obj')
 
-    print 'root:', list(qsh.roots())
-    print 'head:', list(qsh.heads())
-    print 'orphan:', list(qsh.orphanIds())
+    print 'heads:', list(qsh.heads())
+    print 'roots:', list(qsh.versions().roots())
+    print 'orphan:', list(qsh.versions().orphanIds())
 
     ws = qsh.workspace()
     print ws.cs
@@ -70,11 +69,6 @@ if __name__=='__main__':
         for vid, state in cs.parentCS.iterChildIds():
             print '  ', vid, state
         print
-
-    if 0:
-        with qsh:
-            csParent = Changeset(ws, cs.parentId)
-            csPeer = csParent.newChild()
 
     if 0:
         with qsh:

@@ -90,8 +90,12 @@ class VersionSchema(object):
             ;""" % self.ns)
                 
     def createChangesets(self):
+        ns = self.ns
+        defs = self.ns.changesetDefs
+        comma = (',' if defs else '')
+
         self.cur.execute("""\
-            create table if not exists %(qs_changesets)s (
+            create table if not exists %s (
               versionId INTEGER primary key on conflict fail,
               fullVersionId TEXT,
               state TEXT,
@@ -100,10 +104,10 @@ class VersionSchema(object):
 
               parentId INTEGER,
               mergeId INTEGER,
-              mergeFlags TEXT,
+              mergeFlags TEXT%s
 
-              %(changesetDefs)s
-            );""" % self.ns)
+              %s
+            );""" % (ns.qs_changesets, comma, defs))
         self.addColumnsTo('qs_changesets', 'changeset')
 
     def createMeta(self):
