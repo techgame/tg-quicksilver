@@ -7,8 +7,8 @@ from pprint import pprint
 import datetime
 import sqlite3
 
-from TG.quicksilver.sqlite.versions import Versions
-from TG.quicksilver.sqlite.changeset import Changeset
+from TG.quicksilver.be.sqlite import Versions
+from TG.quicksilver.be.sqlite import Changeset
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Main 
