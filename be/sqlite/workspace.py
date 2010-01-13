@@ -4,7 +4,7 @@
 
 import sqlite3
 
-from .utils import OpBase, HostDataView, QuicksilverError
+from ..base.errors import WorkspaceError
 from .metadata import metadataView
 from .workspaceSchema import WorkspaceSchema
 from .changeset import Changeset
@@ -15,10 +15,7 @@ from . import workspaceChangeOps as Ops
 #~ Workspace concept
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class WorkspaceError(QuicksilverError):
-    pass
-
-class Workspace(HostDataView):
+class Workspace(object):
     Schema = WorkspaceSchema
     temporary = False
 

@@ -10,16 +10,16 @@ from .metadata import metadataView
 from .versionsSchema import VersionSchema
 from .workspace import Workspace
 from .changeset import Changeset
-from .changesetCollection import ChangesetCollectionView
+from .changesView import ChangesView
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 sqlite3.register_adapter(Changeset, lambda cs: cs.versionId)
-sqlite3.register_adapter(Workspace, lambda ws: ws.workingId)
+sqlite3.register_adapter(Workspace, lambda ws: ws.cs.versionId)
 
-class Versions(ChangesetCollectionView):
+class Versions(ChangesView):
     ns = Namespace() # copied upon init
     ns.payload = [
         ('payload','BLOB'),

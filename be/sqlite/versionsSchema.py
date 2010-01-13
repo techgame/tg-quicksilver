@@ -5,6 +5,7 @@
 import itertools
 import sqlite3
 
+from ..base.utils import identhash
 from . import utils
 from .metadata import metadataView
 
@@ -148,7 +149,7 @@ class VersionSchema(object):
         if oid0 is not None: 
             return oid0
 
-        h = utils.IndexHasher()
+        h = identhash.Int64IdentHasher()
         h.addInt(nodeId)
         h.addTimestamp()
 

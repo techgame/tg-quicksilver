@@ -3,6 +3,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import os
 from pprint import pprint
 import datetime
 import sqlite3
@@ -22,13 +23,18 @@ if __name__=='__main__':
     print 'orphan:', list(qsh.orphanIds())
 
     ws = qsh.workspace()
-    #ws.cs = None
-    ws.checkout()
-    #cs = ws.checkout(qsh.head())
+    print ws.cs
+
+    if ws.cs is None:
+        ws.cs = qsh.head()
+
+    if ws.cs:
+        print ws.cs
+        ws.checkout()
 
     for e in ws.readAll():
         #print e
-        print e.oid, e.payload, str(e.payload).decode('hex')
+        print e.oid, str(e.payload)
 
     if 1:
         oid = None
@@ -38,14 +44,14 @@ if __name__=='__main__':
         print
         with qsh:
             dt = datetime.datetime.now()
-            data = "charlie tuna!"
+            data = "data/" + os.urandom(4).encode('hex')+'/end'
 
-            ws.write(oid, payload=buffer(data.encode('hex')))
+            ws.write(oid, payload=buffer(data))
             ws.commit()
 
         for e in ws.readAll():
             #print e
-            print e.oid, e.payload, str(e.payload).decode('hex')
+            print e.oid, str(e.payload)
 
     if 0:
         r = qsh.lineage()

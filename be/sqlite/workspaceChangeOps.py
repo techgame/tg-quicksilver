@@ -2,6 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+from ..base.utils import splitColumnData
 from .utils import OpBase
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -15,6 +16,10 @@ class ChangeOpBase(OpBase):
     def __init__(self, host):
         self.setHost(host)
         self.csWorking = host.csWorking
+
+    def setHost(self, host):
+        self.cur = host.cur
+        self.ns = host.ns
 
     def updateDatalog(self, cols, data):
         if cols:
@@ -56,7 +61,7 @@ class Write(ChangeOpBase):
         self.oid = oid
         self.revId = int(self.csWorking)
 
-        cols, data = self.splitColumnData(kwData, self.ns.payload)
+        cols, data = splitColumnData(kwData, self.ns.payload)
         if kwData: 
             raise ValueError("Unknown keys: %s" % (data.keys(),))
         if not data:
