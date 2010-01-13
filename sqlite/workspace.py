@@ -39,7 +39,6 @@ class Workspace(HostDataView):
 
     def _initMeta(self):
         cs = self.getMetaChangeset()
-        print 'cs:', cs
         if cs is None:
             return
 
