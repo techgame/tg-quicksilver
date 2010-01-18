@@ -116,7 +116,7 @@ class Workspace(WorkspaceBase):
         res = self.conn.execute(q, (oid,))
         if asNS:
             res = self._rowsAsNS(res, ns)
-        return res
+        return next(res, None)
 
     def readAll(self, asNS=True):
         ns = self.ns
@@ -131,9 +131,12 @@ class Workspace(WorkspaceBase):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def newOid(self):
+        return self.ns.newOid()
+
     def write(self, oid, **data):
         if oid is None:
-            oid = self.ns.newOid()
+            oid = self.newOid()
         op = Ops.Write(self)
         return op.perform(oid, data)
 

@@ -123,6 +123,8 @@ class WorkspaceBase(object):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def readAll(self, asNS=True):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def newOid(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def write(self, oid, **data):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def remove(self, oid):

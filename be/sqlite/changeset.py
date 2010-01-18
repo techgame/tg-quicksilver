@@ -45,7 +45,6 @@ class Changeset(OpBase, ChangesetBase):
         stmt += "  set %s \n" % (', '.join(columns),)
         stmt += "  where versionId=? "
         values.append(self.versionId)
-        print stmt
         return self.cur.execute(stmt, values)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
