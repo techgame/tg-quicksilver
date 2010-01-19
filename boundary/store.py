@@ -25,14 +25,11 @@ class Ambit(object):
         self._target = obj
         data = self._codec.encode(obj)
         hash = self._codec.hashDigest(data)
-
-        #data = data.encode('zlib')
         self._target = None
         return data, hash
 
     def decode(self, data, meta=None):
         assert self._target is None, self._target
-        #data = data.decode('zlib')
         return self._codec.decode(data, meta)
 
     def _refForObj(self, obj):
@@ -40,7 +37,7 @@ class Ambit(object):
             return
         if obj is self._target:
             return 
-        if not getattr(obj, '__boundary__',False):
+        if not getattr(obj, '__bounded__', False):
             return
 
         oid = self._objCache.get(obj, None)
@@ -88,14 +85,16 @@ class BoundaryStore(object):
         cache[oid] = entry
 
         with self._ambit() as ambit:
-            objData = self.ws.read(oid)
-            if objData is None:
+            record = self.ws.read(oid)
+            if record is None:
                 if default is NotImplemented:
                     raise LookupError("No object found at oid: %r" % (oid,), oid)
                 else: return default
 
-            obj, rest = ambit.decode(bytes(objData.payload), objData)
-            entry.setup(obj, bytes(objData.hash))
+            data = bytes(record.payload)
+            data = data.decode('zlib')
+            obj, record = ambit.decode(data, record)
+            entry.setup(obj, bytes(record.hash))
 
         self._objCache[entry.pxy] = oid
         self._objCache[entry.obj] = oid
@@ -114,7 +113,9 @@ class BoundaryStore(object):
         with self._ambit() as ambit:
             data, hash = ambit.encode(obj)
             entry.setup(obj, hash)
+            data = data.encode('zlib')
             self.ws.write(oid, payload=buffer(data), hash=buffer(hash), **meta)
+
         return oid
 
     def delete(self, oid):
@@ -126,19 +127,37 @@ class BoundaryStore(object):
         self.ws.remove(oid)
 
     def saveAll(self):
+        for e in self.iterSaveAll():
+            pass
+
+    def iterSaveAll(self):
         ws = self.ws
-        cache = self._cache
+        cache = self._cache.items()
         with self._ambit() as ambit:
-            for oid, entry in cache.items():
+            for oid, entry in cache:
                 data, hash = ambit.encode(entry.obj)
-                if entry.hash != hash:
-                    print 'changed:', (entry.hash.encode('hex'), hash.encode('hex'))
+                changed = (entry.hash != hash)
+                yield oid, entry, changed
+                if changed:
                     entry.hash = hash
+                    data = data.encode('zlib')
                     ws.write(oid, payload=buffer(data), hash=buffer(hash))
-                else:
-                    print 'unchanged:', hash.encode('hex')
-        return ws
                     
     def commit(self, **kw):
         return self.ws.commit(**kw)
+
+    def raw(self, obj, decode=True):
+        if isinstance(obj, (int, long)):
+            oid = obj
+        else:
+            oid = self._objCache.get(obj)
+            if oid is None:
+                raise ValueError("Obj must be a boundary tracked object")
+
+        record = self.ws.read(oid)
+        if decode:
+            data = bytes(record.payload)
+            data = data.decode('zlib')
+            record.payload = data
+        return record
 

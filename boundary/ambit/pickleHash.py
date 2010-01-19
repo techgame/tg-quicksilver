@@ -5,8 +5,8 @@
 
 import hashlib
 from pprint import pprint
-#from cPickle import Pickler, Unpickler
-from pickle import Pickler, Unpickler
+from cPickle import Pickler, Unpickler
+#from pickle import Pickler, Unpickler
 from cStringIO import StringIO
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,8 +140,8 @@ class PickleHash(object):
     def _load(self, fh):
         CanonicalObject.counter = 100
         up = self.Unpickler(fh)
-        #up.find_global = self._find_global
-        up.find_class = self._find_global
+        up.find_global = self._find_global
+        #up.find_class = self._find_global
         up.persistent_load = self._persistent_load
         return up.load()
 
