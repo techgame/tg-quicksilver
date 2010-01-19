@@ -18,8 +18,8 @@ from . import workspace
 
 class Versions(VersionsAbstract):
     ns = VersionsAbstract.ns.copy()
-    ns.payload = [('payload','BLOB')]
-    ns.changeset = []
+    ns.payload = [('payload','BLOB'),('hash', 'BLOB')]
+    ns.changeset = [('who', 'STRING')]
 
     Schema = versionsSchema.VersionSchema
     metadata = metadata.metadataView
@@ -75,6 +75,7 @@ class VersionsPlus(Versions):
     ns = Versions.ns.copy()
     ns.payload = [
         ('payload','BLOB'),
+        ('hash','BLOB'),
         ('tags', 'TEXT default null'),
         ]
     ns.changeset = [

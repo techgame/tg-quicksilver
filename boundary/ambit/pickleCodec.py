@@ -2,24 +2,10 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import pickle
+#from cPickle import Pickler, Unpickler
 from pickle import Pickler, Unpickler
+from cStringIO import StringIO
 
-try:
-    import cPickle
-    from cPickle import Pickler, Unpickler
-except ImportError: 
-    cPickle = None
-
-from StringIO import StringIO
-try:
-    import cStringIO
-    from cStringIO import StringIO
-except ImportError: 
-    cStringIO = None
-
-import hashlib
-import pickletools
 from .pickleHash import PickleHash
 from .baseCodec import BaseAmbitCodec
 
@@ -29,6 +15,7 @@ from .baseCodec import BaseAmbitCodec
 
 class PickleAmbitCodec(BaseAmbitCodec):
     Pickler = Pickler
+    PickleHash = PickleHash
     Unpickler = Unpickler
     StringIO = StringIO
     protocol = 2
@@ -39,6 +26,7 @@ class PickleAmbitCodec(BaseAmbitCodec):
         if idForObj is not None:
             p.persistent_id = idForObj
         self._encoding = io, p
+        self._hasher = self.PickleHash()
 
     def _initDecoder(self, objForId=None):
         io = self.StringIO()
@@ -57,7 +45,6 @@ class PickleAmbitCodec(BaseAmbitCodec):
             io.seek(0)
             io.truncate()
 
-        #self.computeHash(data)
         if incMemo:
             return data, p.memo
         else: return data
@@ -76,7 +63,10 @@ class PickleAmbitCodec(BaseAmbitCodec):
             return obj, meta
         else: return obj
 
-    def computeHash(self, data):
-        h = PickleHash().hashs(data)
+    def hashDigest(self, data):
+        h = self._hasher.hashs(data)
+        return h.digest()
+    def hash(self, data):
+        h = self._hasher.hashs(data)
         return h
 
