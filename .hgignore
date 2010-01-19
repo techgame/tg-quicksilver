@@ -8,6 +8,7 @@ syntax: glob
 
 syntax: regexp 
 .*/oow/.*
+oow/.*
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Generally useful ignore configurations
