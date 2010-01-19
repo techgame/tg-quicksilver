@@ -2,6 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import os, sys
 from contextlib import contextmanager
 from .ambit import PickleAmbitCodec
 
@@ -43,7 +44,6 @@ class Ambit(object):
         oid = self._objCache.get(obj, None)
         if oid is None:
             oid = self.host.set(None, obj)
-        print (obj, oid)
         return oid
 
     def _objForRef(self, ref):
@@ -139,8 +139,7 @@ class BoundaryStore(object):
 
                 exdata = ws.read(oid).payload
                 if exdata is not None:
-                    if oid == 100: 
-                        self.compare(data, exdata)
+                    self.compare(oid, data, exdata, ambit)
 
                 ws.write(oid, payload=data)
         return ws
@@ -148,12 +147,47 @@ class BoundaryStore(object):
     def commit(self, **kw):
         return self.ws.commit(**kw)
 
-    def compare(self, data, exdata):
+    def compare(self, oid, data, exdata, ambit):
         import pickletools
 
-        with file('data.raw', 'w') as fh:
-            pickletools.dis(bytes(data), fh)
+        computeHash = ambit._codec.computeHash
+        print "~"*20, "compare", "~"*20
+        print "NEW:"
+        hd, hdhash = computeHash(data)
+        print 
+        print "OLD:"
+        hx, hxhash = computeHash(exdata)
+        print 
 
-        with file('exdata.raw', 'w') as fh:
-            pickletools.dis(bytes(exdata), fh)
+        print "comp:"
+        eq = hd.digest() == hx.digest()
+        print (oid, eq, data==exdata, len(data)==len(exdata))
+        print '    %s/%s' % (len(data), hd.hexdigest())
+        print '    %s/%s' % (len(exdata), hx.hexdigest())
+        if not eq:
+            with file('hash_N.hash', 'w') as fh:
+                for l in hdhash.split('\n'):
+                    print >>fh, l.encode('hex')
 
+            with file('hash_X.hash', 'w') as fh:
+                for l in hxhash.split('\n'):
+                    print >>fh, l.encode('hex')
+
+            os.system('diff hash_N.hash hash_X.hash > hash.diff')
+
+            with file('N.pickle', 'w') as fh:
+                fh.write(bytes(data))
+
+            with file('X.pickle', 'w') as fh:
+                fh.write(bytes(exdata))
+
+            with file('dis_N.dis', 'w') as fh:
+                pickletools.dis(bytes(data), fh)
+
+            with file('dis_X.dis', 'w') as fh:
+                pickletools.dis(bytes(exdata), fh)
+
+            os.system('diff dis_N.dis dis_X.dis > dis.diff')
+
+        print "~"*60
+        print
