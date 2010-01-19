@@ -76,31 +76,18 @@ class BoundaryStore(object):
         yield Ambit(self)
 
     def get(self, oid, default=NotImplemented):
-        cache = self._cache
-        r = cache.get(oid, cache)
-        if r is not cache:
+        r = self._cache.get(oid, self)
+        if r is not self:
             return r.pxy
 
         entry = BoundaryEntry(oid)
-        cache[oid] = entry
+        if self._readEntry(entry):
+            return entry.pxy
+        elif default is NotImplemented:
+            raise LookupError("No object found for oid: %r" % (oid,), oid)
+        return default
 
-        with self._ambit() as ambit:
-            record = self.ws.read(oid)
-            if record is None:
-                if default is NotImplemented:
-                    raise LookupError("No object found at oid: %r" % (oid,), oid)
-                else: return default
-
-            data = bytes(record.payload)
-            data = data.decode('zlib')
-            obj, record = ambit.decode(data, record)
-            entry.setup(obj, bytes(record.hash))
-
-        self._objCache[entry.pxy] = oid
-        self._objCache[entry.obj] = oid
-        return obj
-
-    def set(self, oid, obj, **meta):
+    def set(self, oid, obj):
         if oid is None:
             oid = self.ws.newOid()
 
@@ -110,17 +97,11 @@ class BoundaryStore(object):
         self._objCache[entry.pxy] = oid
         self._objCache[entry.obj] = oid
 
-        with self._ambit() as ambit:
-            data, hash = ambit.encode(obj)
-            entry.setup(obj, hash)
-            data = data.encode('zlib')
-            self.ws.write(oid, payload=buffer(data), hash=buffer(hash), **meta)
-
+        self._writeEntry(entry)
         return oid
 
     def delete(self, oid):
-        cache = self._cache
-        entry = cache.pop(oid, None)
+        entry = self._cache.pop(oid, None)
         if entry is not None:
             self._objCache.pop(entry.obj, None)
             self._objCache.pop(entry.pxy, None)
@@ -130,34 +111,80 @@ class BoundaryStore(object):
         for e in self.iterSaveAll():
             pass
 
-    def iterSaveAll(self):
-        ws = self.ws
-        cache = self._cache.items()
+    def iterSaveAll(self, entries=None):
+        if entries is None:
+            entries = self._cache.values()
+
+        writeEntry = self._writeEntry
         with self._ambit() as ambit:
-            for oid, entry in cache:
-                data, hash = ambit.encode(entry.obj)
-                changed = (entry.hash != hash)
-                yield oid, entry, changed
-                if changed:
-                    entry.hash = hash
-                    data = data.encode('zlib')
-                    ws.write(oid, payload=buffer(data), hash=buffer(hash))
+            for entry in entries:
+                changed = writeEntry(entry)
+                yield entry, changed
                     
     def commit(self, **kw):
         return self.ws.commit(**kw)
 
-    def raw(self, obj, decode=True):
-        if isinstance(obj, (int, long)):
-            oid = obj
-        else:
-            oid = self._objCache.get(obj)
-            if oid is None:
-                raise ValueError("Obj must be a boundary tracked object")
-
-        record = self.ws.read(oid)
-        if decode:
+    def raw(self, oidOrObj, decode=True):
+        oidOrObj = self._objCache.get(oidOrObj, oidOrObj)
+        record = self.ws.read(oidOrObj)
+        if decode and record:
             data = bytes(record.payload)
             data = data.decode('zlib')
+            self._onRead(record, data)
             record.payload = data
+        else:
+            self._onRead(record, None)
         return record
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _readEntry(self, entry):
+        oid = entry.oid
+        with self._ambit() as ambit:
+            record = self.ws.read(oid)
+            if record is None:
+                return False
+
+            self._cache[oid] = entry
+            self._objCache[entry.pxy] = oid
+
+            data = bytes(record.payload)
+            data = data.decode('zlib')
+            self._onRead(record, data)
+            obj, record = ambit.decode(data, record)
+            entry.setup(obj, bytes(record.hash))
+
+        self._objCache[entry.obj] = oid
+        return True
+
+    def _writeEntry(self, entry):
+        with self._ambit() as ambit:
+            data, hash = ambit.encode(entry.obj)
+            changed = (entry.hash != hash)
+            if changed:
+                entry.setup(entry.obj, hash)
+                payload = data.encode('zlib')
+                self._onWrite(payload, data)
+                self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
+        return changed
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def _onReadNull(self, record, data=None): pass
+    _onRead =_onReadNull
+    def _onReadStats(self, record, data=None):
+        if data is None:
+            return
+        print '@read  %8.1f%% = %6i/%6i' % (
+                ((100.0 * len(data))/len(record.payload)),
+                len(data), len(record.payload),)
+
+    _onRead = _onReadStats
+
+    def _onWriteNull(self, payload, data): pass
+    _onWrite = _onWriteNull
+    def _onWriteStats(self, payload, data):
+        print '@write %8.1f%% = %6i/%6i' % (
+                ((100.0 * len(data))/len(payload)),
+                len(data), len(payload),)
+    _onWrite = _onWriteStats
 
