@@ -153,10 +153,10 @@ class BoundaryStore(object):
         computeHash = ambit._codec.computeHash
         print "~"*20, "compare", "~"*20
         print "NEW:"
-        hd, hdhash = computeHash(data)
+        hd = computeHash(data)
         print 
         print "OLD:"
-        hx, hxhash = computeHash(exdata)
+        hx = computeHash(exdata)
         print 
 
         print "comp:"
