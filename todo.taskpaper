@@ -1,0 +1,4 @@
+Boundry Store:
+- Change get implementation to allow deferred proxy
+- Add threaded hash delegation object to speed up serial storage
+
