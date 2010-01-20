@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -155,17 +154,4 @@ class PickleHash(object):
 
     def _persistent_load(self, ref):
         return ('ref', ref)
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-if __name__=='__main__':
-    fhN = open('N.pickle', 'rb')
-    fhX = open('X.pickle', 'rb')
-
-    nh = PickleHash().hash(fhN).hexdigest()
-    xh = PickleHash().hash(fhX).hexdigest()
-
-    print nh == xh
-    print nh
-    print xh
 
