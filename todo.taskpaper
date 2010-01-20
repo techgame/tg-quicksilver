@@ -1,4 +1,20 @@
 Boundry Store:
+- Add ambit cache @done
+- Prevent storage of boundary store objects @done
 - Change get implementation to allow deferred proxy
 - Add threaded hash delegation object to speed up serial storage
+- Add support for writing only marked dirty objects @done
 
+AL Thoughts:
+- ALOS.view .app .user as boundary objects
+    - Other canidates: ALOS.viewset
+
+- Transform resources to be object based instead
+
+Tools:
+- Dot visualizers
+    - for individual stores
+    - for boundary references as a whole
+
+- Reference walker, allowing us to do garbage collection over a workspace
+- JSON store

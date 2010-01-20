@@ -4,65 +4,31 @@
 
 import os, sys
 from contextlib import contextmanager
-from .ambit import PickleAmbitCodec
+from . import NotStorableMixin
+from .ambit import AmbitStrategy
 from .rootProxy import RootProxy
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class Ambit(object):
-    Codec = PickleAmbitCodec
-
-    def __init__(self, host):
-        self.host = host
-        self._objCache = host._objCache
-        self._codec = self.Codec(self._refForObj, self._objForRef)
-        self._target = None
-
-    def encode(self, obj):
-        assert self._target is None, self._target
-        self._target = obj
-        data = self._codec.encode(obj)
-        hash = self._codec.hashDigest(data)
-        self._target = None
-        return data, hash
-
-    def decode(self, data, meta=None):
-        assert self._target is None, self._target
-        return self._codec.decode(data, meta)
-
-    def _refForObj(self, obj):
-        if isinstance(obj, type): 
-            return
-        if obj is self._target:
-            return 
-        if not getattr(obj, '__bounded__', False):
-            return
-
-        oid = self._objCache.get(obj, None)
-        if oid is None:
-            oid = self.host.set(None, obj, True)
-        return oid
-
-    def _objForRef(self, ref):
-        obj = self.host.get(ref)
-        return obj
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-class BoundaryEntry(object):
-    __slots__ = ['oid', 'hash', 'obj', 'pxy']
+class BoundaryEntry(NotStorableMixin):
+    __slots__ = ['oid', 'hash', 'obj', 'pxy', 'dirty']
     def __init__(self, oid):
         self.oid = oid
+        self.dirty = True
         self.pxy = RootProxy()
 
     def setup(self, obj, hash):
         self.obj = obj
         self.hash = hash
+        self.dirty = not hash
         object.__setattr__(self.pxy, '_obj_', obj)
 
-class BoundaryStore(object):
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BoundaryStore(NotStorableMixin):
+    AmbitStrategy = AmbitStrategy
     def __init__(self, workspace):
         self.init(workspace)
 
@@ -71,10 +37,17 @@ class BoundaryStore(object):
         self._cache = {}
         self._objCache = {}
         self._newEntries = []
+        self._ambitList = []
 
     @contextmanager
-    def _ambit(self):
-        yield Ambit(self)
+    def ambit(self):
+        ambitList = self._ambitList
+        if ambitList:
+            a = ambitList.pop()
+        else: a = self.AmbitStrategy(self)
+
+        yield a
+        ambitList.append(a)
 
     def get(self, oid, default=NotImplemented):
         r = self._cache.get(oid, self)
@@ -90,6 +63,13 @@ class BoundaryStore(object):
             raise LookupError("No object found for oid: %r" % (oid,), oid)
         return default
 
+    def mark(self, oidOrObj, dirty=True):
+        oid = self._objCache.get(oidOrObj, oidOrObj)
+        entry = self._cache[oid]
+        if dirty is not None:
+            entry.dirty = dirty
+        return entry
+
     def set(self, oid, obj, deferred=False):
         if oid is None:
             oid = self.ws.newOid()
@@ -104,6 +84,7 @@ class BoundaryStore(object):
             self._newEntries.append(entry)
         else:
             self._writeEntry(entry)
+            self._writeEntryCollection(self._iterNewEntries())
         return oid
 
     def delete(self, oid):
@@ -114,27 +95,19 @@ class BoundaryStore(object):
         self.ws.remove(oid)
 
     def saveAll(self):
-        for e in self.iterSaveAll():
-            pass
+        entryColl = self._iterNewEntries(self._cache.values())
+        return self._writeEntryCollection(entryColl)
 
     def iterSaveAll(self):
-        writeEntry = self._writeEntry
-        entries = self._cache.values()
-        while entries:
-            for entry in entries:
-                changed, datalen = writeEntry(entry)
-                yield entry, changed, datalen
+        entryColl = self._iterNewEntries(self._cache.values())
+        return self._iterWriteEntryCollection(entryColl)
 
-            entries = self._newEntries
-            print 'newEntries: ', len(entries)
-            self._newEntries = []
-                    
     def commit(self, **kw):
         return self.ws.commit(**kw)
 
     def raw(self, oidOrObj, decode=True):
-        oidOrObj = self._objCache.get(oidOrObj, oidOrObj)
-        record = self.ws.read(oidOrObj)
+        oid = self._objCache.get(oidOrObj, oidOrObj)
+        record = self.ws.read(oid)
         if decode and record:
             data = bytes(record.payload)
             if data:
@@ -151,7 +124,7 @@ class BoundaryStore(object):
 
     def _readEntry(self, entry):
         oid = entry.oid
-        with self._ambit() as ambit:
+        with self.ambit() as ambit:
             record = self.ws.read(oid)
             if record is None:
                 return False
@@ -164,15 +137,18 @@ class BoundaryStore(object):
             data = bytes(record.payload)
             data = data.decode('zlib')
             self._onRead(record, data)
-            obj, record = ambit.decode(data, record)
+            obj = ambit.load(oid, data, record)
             entry.setup(obj, bytes(record.hash))
 
         self._objCache[entry.obj] = oid
         return True
 
     def _writeEntry(self, entry):
-        with self._ambit() as ambit:
-            data, hash = ambit.encode(entry.obj)
+        if not entry.dirty:
+            return False, None
+
+        with self.ambit() as ambit:
+            data, hash = ambit.dump(entry.oid, entry.obj)
             changed = (entry.hash != hash)
             if changed:
                 entry.setup(entry.obj, hash)
@@ -182,23 +158,57 @@ class BoundaryStore(object):
         return changed, len(data)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Collection writing
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _onReadNull(self, record, data=None): pass
-    _onRead =_onReadNull
-    def _onReadStats(self, record, data=None):
-        if data is None:
-            return
-        print '@read  %8.1f%% = %6i/%6i' % (
-                ((100.0 * len(data))/len(record.payload)),
-                len(data), len(record.payload),)
+    def _writeEntryCollection(self, entryCollection, onError=None):
+        if onError is None:
+            onError = self._onWriteError
+        writeEntry = self._writeEntry
+        for entries in entryCollection:
+            for entry in entries:
+                try: 
+                    writeEntry(entry)
+                except Exception, exc:
+                    if onError(entry, exc):
+                        raise
 
-    #_onRead = _onReadStats
+    def _iterWriteEntryCollection(self, entryCollection, onError=None):
+        if onError is None:
+            onError = self._onWriteError
+        writeEntry = self._writeEntry
+        for entries in entryCollection:
+            for entry in entries:
+                try: 
+                    r = writeEntry(entry)
+                except Exception, exc:
+                    if onError(entry, exc):
+                        raise
+                else:
+                    yield entry, r
 
-    def _onWriteNull(self, payload, data): pass
-    _onWrite = _onWriteNull
-    def _onWriteStats(self, payload, data):
-        print '@write %8.1f%% = %6i/%6i' % (
-                ((100.0 * len(data))/len(payload)),
-                len(data), len(payload),)
-    #_onWrite = _onWriteStats
+    def _iterNewEntries(self, entries=None):
+        if entries is not None:
+            yield entries
+
+        entries = self._popNewEntries()
+        while entries:
+            yield entries
+            entries = self._popNewEntries()
+
+    def _popNewEntries(self):
+        entries = self._newEntries
+        if entries:
+            self._newEntries = []
+            return entries
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _onWrite(self, payload, data): 
+        pass
+    def _onRead(self, record, data=None): 
+        pass
+
+    def _onWriteError(self, entry, exc):
+        sys.excepthook(*sys.exc_info())
 

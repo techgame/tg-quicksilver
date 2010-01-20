@@ -6,7 +6,7 @@ import timeit
 import myModule
 
 from TG.quicksilver.be.sqlite import Versions
-from TG.quicksilver.boundary import BoundaryStore
+from TG.quicksilver.boundary import BoundaryStore, StatsBoundaryStore
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -39,7 +39,10 @@ def test(bs, aList):
 def main():
     qsh = Versions('db_quicksilver.qag', 'obj')
     ws = qsh.workspace()
-    bs = BoundaryStore(ws)
+    if 0:
+        bs = BoundaryStore(ws)
+    else:
+        bs = StatsBoundaryStore(ws)
 
     print ws.cs
     if ws.cs is None:
@@ -76,15 +79,23 @@ def main():
         root.data = myModule.myData
     elif 1:
         root.data.extend(myModule.genList(10))
+        bs.mark(root)
     elif 0:
         root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
     elif 0:
         root.data.extend(myModule.genList(100))
 
     with qsh:
-        for entry, changed, datalen in bs.iterSaveAll():
-            print 'save:', entry.oid, changed, datalen
+        if 1:
+            bs.saveAll()
+        else:
+            for entry, r in bs.iterSaveAll():
+                print 'save:', entry.oid, r
         bs.commit()
+
+    stats = getattr(bs, 'stats', None)
+    if stats is not None:
+        stats.printStats()
     #test(bs, myModule.myData)
 
 if __name__=='__main__':

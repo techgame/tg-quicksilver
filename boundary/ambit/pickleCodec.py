@@ -25,7 +25,7 @@ class PickleAmbitCodec(BaseAmbitCodec):
         p = self.Pickler(io, self.protocol)
         if idForObj is not None:
             p.persistent_id = idForObj
-        self._encoding = io, p
+        self._encoding = io, p, self._clearMemo
         self._hasher = self.PickleHash()
 
     def _initDecoder(self, objForId=None):
@@ -35,8 +35,18 @@ class PickleAmbitCodec(BaseAmbitCodec):
             up.persistent_load = objForId
         self._decoding = io, up
 
-    def encode(self, obj, incMemo=False):
-        io, p = self._encoding
+    _clearMemo = True
+    def getClearMemo(self):
+        return self._encoding[-1]
+    def setClearMemo(self, clearMemo):
+        io, p, _ = self._encoding
+        self._encoding = io, p, clearMemo
+    clearMemo = property(getClearMemo, setClearMemo)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def dump(self, obj, hash=True):
+        io, p, clear = self._encoding
         p.clear_memo()
         try:
             p.dump(obj)
@@ -44,12 +54,15 @@ class PickleAmbitCodec(BaseAmbitCodec):
         finally:
             io.seek(0)
             io.truncate()
+            if clear:
+                p.clear_memo()
 
-        if incMemo:
-            return data, p.memo
+        if hash:
+            hash = self.hashDigest(data)
+            return data, hash
         else: return data
 
-    def decode(self, data, meta=None):
+    def load(self, data, meta=None):
         io, up = self._decoding
         io.write(data)
         io.seek(0)
@@ -58,10 +71,7 @@ class PickleAmbitCodec(BaseAmbitCodec):
         finally:
             io.seek(0)
             io.truncate()
-
-        if meta is not None:
-            return obj, meta
-        else: return obj
+        return obj
 
     def hashDigest(self, data):
         h = self._hasher.hashs(data)
