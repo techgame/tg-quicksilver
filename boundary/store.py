@@ -42,7 +42,7 @@ class Ambit(object):
 
         oid = self._objCache.get(obj, None)
         if oid is None:
-            oid = self.host.set(None, obj)
+            oid = self.host.set(None, obj, True)
         return oid
 
     def _objForRef(self, ref):
@@ -70,6 +70,7 @@ class BoundaryStore(object):
         self.ws = workspace
         self._cache = {}
         self._objCache = {}
+        self._newEntries = []
 
     @contextmanager
     def _ambit(self):
@@ -84,10 +85,12 @@ class BoundaryStore(object):
         if self._readEntry(entry):
             return entry.pxy
         elif default is NotImplemented:
+            for k in self._cache.keys():
+                print k
             raise LookupError("No object found for oid: %r" % (oid,), oid)
         return default
 
-    def set(self, oid, obj):
+    def set(self, oid, obj, deferred=False):
         if oid is None:
             oid = self.ws.newOid()
 
@@ -97,7 +100,10 @@ class BoundaryStore(object):
         self._objCache[entry.pxy] = oid
         self._objCache[entry.obj] = oid
 
-        self._writeEntry(entry)
+        if deferred:
+            self._newEntries.append(entry)
+        else:
+            self._writeEntry(entry)
         return oid
 
     def delete(self, oid):
@@ -111,15 +117,17 @@ class BoundaryStore(object):
         for e in self.iterSaveAll():
             pass
 
-    def iterSaveAll(self, entries=None):
-        if entries is None:
-            entries = self._cache.values()
-
+    def iterSaveAll(self):
         writeEntry = self._writeEntry
-        with self._ambit() as ambit:
+        entries = self._cache.values()
+        while entries:
             for entry in entries:
-                changed = writeEntry(entry)
-                yield entry, changed
+                changed, datalen = writeEntry(entry)
+                yield entry, changed, datalen
+
+            entries = self._newEntries
+            print 'newEntries: ', len(entries)
+            self._newEntries = []
                     
     def commit(self, **kw):
         return self.ws.commit(**kw)
@@ -129,7 +137,8 @@ class BoundaryStore(object):
         record = self.ws.read(oidOrObj)
         if decode and record:
             data = bytes(record.payload)
-            data = data.decode('zlib')
+            if data:
+                data = data.decode('zlib')
             self._onRead(record, data)
             record.payload = data
         else:
@@ -137,12 +146,16 @@ class BoundaryStore(object):
         return record
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Read and write entry workhorses
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def _readEntry(self, entry):
         oid = entry.oid
         with self._ambit() as ambit:
             record = self.ws.read(oid)
             if record is None:
+                return False
+            if record.payload is None:
                 return False
 
             self._cache[oid] = entry
@@ -166,9 +179,10 @@ class BoundaryStore(object):
                 payload = data.encode('zlib')
                 self._onWrite(payload, data)
                 self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
-        return changed
+        return changed, len(data)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     def _onReadNull(self, record, data=None): pass
     _onRead =_onReadNull
     def _onReadStats(self, record, data=None):
@@ -178,7 +192,7 @@ class BoundaryStore(object):
                 ((100.0 * len(data))/len(record.payload)),
                 len(data), len(record.payload),)
 
-    _onRead = _onReadStats
+    #_onRead = _onReadStats
 
     def _onWriteNull(self, payload, data): pass
     _onWrite = _onWriteNull
@@ -186,5 +200,5 @@ class BoundaryStore(object):
         print '@write %8.1f%% = %6i/%6i' % (
                 ((100.0 * len(data))/len(payload)),
                 len(data), len(payload),)
-    _onWrite = _onWriteStats
+    #_onWrite = _onWriteStats
 
