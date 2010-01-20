@@ -37,7 +37,7 @@ class ChangesetAbstract(NotStorableMixin):
     def __repr__(self):
         name = self.__class__.__name__
         if not self._initialized:
-            return "<%s ref|%x>" % (name, self.versionId)
+            return "<%s ref|%x>" % (name, self.versionId or 0)
         else:
             return "<%s %s|%x at %s>" % (name, self.state, self.versionId, self.ts)
 
@@ -259,6 +259,9 @@ class ChangesetBase(ChangesetAbstract):
         if kw: 
             raise ValueError("Unknown keys: %s" % (kw.keys(),))
         return self._updateEntryColumnsValues(c,v)
+
+    def revert(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     def _insertEntryItems(self, _items_=None, **kw):
         columns, vals = utils.splitKeyValsEx(_items_, kw)
