@@ -113,10 +113,10 @@ class BoundaryStore(NotStorableMixin):
             data = bytes(record.payload)
             if data:
                 data = data.decode('zlib')
-            self._onRead(record, data)
+            self._onRead(record, data, None)
             record.payload = data
         else:
-            self._onRead(record, None)
+            self._onRead(record, None, None)
         return record
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,9 +137,9 @@ class BoundaryStore(NotStorableMixin):
 
             data = bytes(record.payload)
             data = data.decode('zlib')
-            self._onRead(record, data)
             obj = ambit.load(oid, data, record)
             entry.setup(obj, bytes(record.hash))
+            self._onRead(record, data, entry)
 
         self._objCache[entry.obj] = oid
         return True
@@ -154,7 +154,7 @@ class BoundaryStore(NotStorableMixin):
             if changed:
                 entry.setup(entry.obj, hash)
                 payload = data.encode('zlib')
-                self._onWrite(payload, data)
+                self._onWrite(payload, data, entry)
                 self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
         return changed, len(data)
 
@@ -205,9 +205,9 @@ class BoundaryStore(NotStorableMixin):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _onWrite(self, payload, data): 
+    def _onWrite(self, payload, data, entry): 
         pass
-    def _onRead(self, record, data=None): 
+    def _onRead(self, record, data, entry): 
         pass
 
     def _onWriteError(self, entry, exc):

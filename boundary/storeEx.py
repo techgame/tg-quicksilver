@@ -37,14 +37,14 @@ class BoundaryStats(object):
                 ((100.0 * self.w_data)/max(1,self.w_payload)),
                 self.w_data, self.w_payload)
 
-    def _onRead(self, record, data=None):
+    def _onRead(self, record, data, entry):
         if data is None:
             return
         self.r_count += 1
         self.r_payload += len(record.payload)
         self.r_data += len(data)
 
-    def _onWrite(self, payload, data):
+    def _onWrite(self, payload, data, entry):
         self.w_count += 1
         self.w_payload += len(payload)
         self.w_data += len(data)
