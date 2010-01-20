@@ -31,7 +31,7 @@ class BaseAmbitCodec(NotStorableMixin):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BaseAmbitStrategy(NotStorableMixin):
-    #Codec = some subclass of BaseAmbitCodec
+    Codec = None  # some subclass of BaseAmbitCodec
 
     def __init__(self, host):
         self.host = host

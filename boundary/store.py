@@ -111,7 +111,8 @@ class BoundaryStore(NotStorableMixin):
         record = self.ws.read(oid)
         if decode and record:
             data = bytes(record.payload)
-            if data:
+            if data.startswith('\x78\x9c'):
+                # zlib encoded
                 data = data.decode('zlib')
             self._onRead(record, data, None)
             record.payload = data
@@ -136,7 +137,10 @@ class BoundaryStore(NotStorableMixin):
             self._objCache[entry.pxy] = oid
 
             data = bytes(record.payload)
-            data = data.decode('zlib')
+            if data.startswith('\x78\x9c'):
+                # zlib encoded
+                data = data.decode('zlib')
+
             obj = ambit.load(oid, data, record)
             entry.setup(obj, bytes(record.hash))
             self._onRead(record, data, entry)
