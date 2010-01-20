@@ -79,14 +79,19 @@ class Workspace(WorkspaceBase):
     def _updateCurrentChangeset(self):
         return self.saveCurrentChangeset()
 
+    def _iterLineageToState(self, cs, state='mark'):
+        if cs is None: 
+            cs = self.cs
+        for v,s in cs.iterLineage():
+            yield (v,)
+            if s == state:
+                break
     def fetchVersions(self, cs):
-        versions = [(v,) for v,s in cs.iterLineage() if s != 'mark']
-
+        versions = self._iterLineageToState(cs, 'mark')
         res = self.cur.executemany("""\
-            replace into %(ws_version)s
+            insert or ignore into %(ws_version)s
                 select * from %(qs_manifest)s
                     where versionId=?;""" % self.ns, versions)
-        self._versionsToMark = versions
         return res
 
     def clearWorkspace(self):
