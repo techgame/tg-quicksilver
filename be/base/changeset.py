@@ -3,6 +3,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 from datetime import datetime
+from ...mixins import NotStorableMixin
 from . import utils
 from .utils import identhash
 from .errors import ChangesetError
@@ -11,7 +12,7 @@ from .errors import ChangesetError
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class ChangesetAbstract(object):
+class ChangesetAbstract(NotStorableMixin):
     def __init__(self, host, versionId=None):
         self.setHost(host)
         if versionId:

@@ -2,13 +2,14 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+from ...mixins import NotStorableMixin
 from .utils import Namespace
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class VersionsAbstract(object):
+class VersionsAbstract(NotStorableMixin):
     ns = Namespace()
 
     def workspace(self, *args, **kw):

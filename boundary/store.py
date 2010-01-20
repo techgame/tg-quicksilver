@@ -4,7 +4,8 @@
 
 import os, sys
 from contextlib import contextmanager
-from . import NotStorableMixin
+
+from ..mixins import NotStorableMixin
 from .ambit import AmbitStrategy
 from .rootProxy import RootProxy
 

@@ -77,6 +77,7 @@ def main():
     if root.data is None:
         print 'adding data:'
         root.data = myModule.myData
+        bs.mark(root)
     elif 1:
         root.data.extend(myModule.genList(10))
         bs.mark(root)
