@@ -15,16 +15,17 @@ from .rootProxy import RootProxy
 
 class BoundaryEntry(NotStorableMixin):
     __slots__ = ['oid', 'hash', 'obj', 'pxy', 'dirty']
+    RootProxy = RootProxy
     def __init__(self, oid):
         self.oid = oid
         self.dirty = True
-        self.pxy = RootProxy()
+        self.pxy = self.RootProxy()
 
     def setup(self, obj, hash):
         self.obj = obj
         self.hash = hash
         self.dirty = not hash
-        object.__setattr__(self.pxy, '_obj_', obj)
+        self.RootProxy.adaptProxy(self.pxy, obj)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
