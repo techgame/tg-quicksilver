@@ -36,6 +36,7 @@ class WorkspaceSchema(object):
               versionId INTEGER,
               oid INTEGER primary key,
               revId INTEGER,
+              ws_revId INTEGER,
               flags INTEGER
             );""" % self.ns)
 

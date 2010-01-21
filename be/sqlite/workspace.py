@@ -76,8 +76,9 @@ class Workspace(WorkspaceBase):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ overridden template methods ~~~~~~~~~~~~~~~~~~~~~~
 
-    def _updateCurrentChangeset(self):
-        return self.saveCurrentChangeset()
+    def _updateCurrentChangeset(self, cs):
+        self.tagRevIds()
+        return self.saveCurrentChangeset(cs)
 
     def _iterLineageToState(self, cs, state='mark'):
         if cs is None: 
@@ -93,6 +94,9 @@ class Workspace(WorkspaceBase):
                 select * from %(qs_manifest)s
                     where versionId=?;""" % self.ns, versions)
         return res
+
+    def tagRevIds(self):
+        self.cur.execute("update %(ws_version)s set ws_revId=revId;"%self.ns)
 
     def clearWorkspace(self):
         self.checkCommited()
@@ -144,6 +148,10 @@ class Workspace(WorkspaceBase):
             oid = self.newOid()
         op = Ops.Write(self)
         return op.perform(oid, data)
+
+    def rollback(self, oid=None):
+        op = Ops.Rollback(self)
+        return op.perform(oid)
 
     def remove(self, oid):
         if oid is None:

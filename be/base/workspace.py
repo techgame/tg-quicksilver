@@ -51,11 +51,11 @@ class WorkspaceBase(NotStorableMixin):
 
         cs = csParent.newChild()
         self._csWorking = cs
-        self._updateCurrentChangeset()
+        self._updateCurrentChangeset(cs)
         return cs
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    #~ Title 
+    #~ Workspace Operations 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def checkCommited(self, fail=True):
@@ -75,7 +75,7 @@ class WorkspaceBase(NotStorableMixin):
         self.fetchVersions(cs)
 
         self.csCheckout = cs
-        self._updateCurrentChangeset()
+        self._updateCurrentChangeset(cs)
         return cs
 
     def commit(self, **kw):
@@ -89,7 +89,7 @@ class WorkspaceBase(NotStorableMixin):
         self.clearLog()
         self.csWorking = None
         self.csCheckout = cs
-        self._updateCurrentChangeset()
+        self._updateCurrentChangeset(cs)
 
         self._dbCommit()
         return True
@@ -101,12 +101,12 @@ class WorkspaceBase(NotStorableMixin):
         self.csWorking = None
         self.clearLog()
         self.clearWorkspace()
-        self._updateCurrentChangeset()
+        self._updateCurrentChangeset(self.cs)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ template methods to effect workspace ~~~~~~~~~~~~~
 
-    def _updateCurrentChangeset(self):
+    def _updateCurrentChangeset(self, cs):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def fetchVersions(self, cs):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
@@ -130,5 +130,7 @@ class WorkspaceBase(NotStorableMixin):
     def write(self, oid, **data):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def remove(self, oid):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def rollback(self, oid=None):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
