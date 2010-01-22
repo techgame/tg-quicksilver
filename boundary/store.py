@@ -31,6 +31,8 @@ class BoundaryEntry(NotStorableMixin):
 
 class BoundaryStore(NotStorableMixin):
     AmbitStrategy = AmbitStrategy
+    saveDirtyOnly = True
+
     def __init__(self, workspace):
         self.init(workspace)
 
@@ -149,8 +151,13 @@ class BoundaryStore(NotStorableMixin):
         self._objCache[entry.obj] = oid
         return True
 
+    def _checkWriteEntry(self):
+        if self.saveDirtyOnly:
+            return entry.dirty
+        else: return True 
+
     def _writeEntry(self, entry):
-        if not entry.dirty:
+        if not self._checkWriteEntry(entry):
             return False, None
 
         with self.ambit() as ambit:
