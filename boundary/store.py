@@ -53,13 +53,15 @@ class BoundaryStore(NotStorableMixin):
         yield a
         ambitList.append(a)
 
-    def get(self, oid, default=NotImplemented):
+    def get(self, oid, default=NotImplemented, deferred=False):
         r = self._cache.get(oid, self)
         if r is not self:
             return r.pxy
 
         entry = BoundaryEntry(oid)
-        if self._readEntry(entry):
+        if not deferred and self._readEntry(entry):
+            return entry.pxy
+        elif deferred and self._hasEntry(entry):
             return entry.pxy
         elif default is NotImplemented:
             for k in self._cache.keys():
@@ -127,6 +129,9 @@ class BoundaryStore(NotStorableMixin):
     #~ Read and write entry workhorses
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def _hasEntry(self, entry):
+        return self.ws.contains(entry.oid)
+
     def _readEntry(self, entry):
         oid = entry.oid
         with self.ambit() as ambit:
@@ -151,7 +156,7 @@ class BoundaryStore(NotStorableMixin):
         self._objCache[entry.obj] = oid
         return True
 
-    def _checkWriteEntry(self):
+    def _checkWriteEntry(self, entry):
         if self.saveDirtyOnly:
             return entry.dirty
         else: return True 
@@ -162,12 +167,17 @@ class BoundaryStore(NotStorableMixin):
 
         with self.ambit() as ambit:
             data, hash = ambit.dump(entry.oid, entry.obj)
-            changed = (entry.hash != hash)
-            if changed:
-                entry.setup(entry.obj, hash)
-                payload = data.encode('zlib')
+            if isinstance(hash, bytes):
+                changed = (entry.hash != hash)
+                if changed:
+                    entry.setup(entry.obj, hash)
+                    payload = data.encode('zlib')
+                    self._onWrite(payload, data, entry)
+                    self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
+            else:
                 self._onWrite(payload, data, entry)
-                self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
+                seqId = self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
+
         return changed, len(data)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
