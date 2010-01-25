@@ -167,16 +167,19 @@ class BoundaryStore(NotStorableMixin):
 
         with self.ambit() as ambit:
             data, hash = ambit.dump(entry.oid, entry.obj)
-            if isinstance(hash, bytes):
-                changed = (entry.hash != hash)
-                if changed:
-                    entry.setup(entry.obj, hash)
-                    payload = data.encode('zlib')
-                    self._onWrite(payload, data, entry)
-                    self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
-            else:
+            changed = (entry.hash != hash)
+            if changed:
+                entry.setup(entry.obj, hash)
+                payload = buffer(data.encode('zlib'))
                 self._onWrite(payload, data, entry)
-                seqId = self.ws.write(entry.oid, payload=buffer(payload), hash=buffer(hash))
+                if isinstance(hash, bytes):
+                    hash = buffer(hash)
+                    task = None
+                else:
+                    task = hash
+                    hash = None
+
+                seqId = self.ws.write(entry.oid, payload=payload, hash=hash)
 
         return changed, len(data)
 
