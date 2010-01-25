@@ -140,6 +140,19 @@ class Workspace(WorkspaceBase):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    grpId = None
+    def nextGroupId(self, grpId=False):
+        if grpId is False:
+            grpId = self.grpId
+        if grpId is None:
+            q = 'select max(grpId) from %s'%(self.ns.ws_log,)
+            r = self.conn.execute(q).fetchone()
+            grpId = (r[0] or -1) + 1
+
+        grpId += 1
+        self.grpId = grpId
+        return grpId
+
     def newOid(self):
         return self.ns.newOid()
 
@@ -149,9 +162,9 @@ class Workspace(WorkspaceBase):
         op = Ops.Write(self)
         return op.perform(oid, data)
 
-    def rollback(self, oid=None):
+    def rollback(self, oid=None, seqId=None):
         op = Ops.Rollback(self)
-        return op.perform(oid)
+        return op.perform(oid, seqId)
 
     def remove(self, oid):
         if oid is None:

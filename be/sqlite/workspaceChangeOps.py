@@ -20,83 +20,66 @@ class ChangeOpBase(OpBase):
     def setHost(self, host):
         self.cur = host.cur
         self.ns = host.ns
+        self.grpId = host.grpId
 
     def perform(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     def updateDatalog(self, cols, data):
-        if cols:
-            args = (', ' + ', '.join(cols), ',?'*len(cols))
-        else: args = ('', '')
+        ex = self.cur.execute; ns = self.ns
 
-        stmt  = '%s into %s '
-        stmt += '(revId, oid%s) values (?,?%s)' % args
-        data[0:0] = [self.revId, self.oid]
+        #r = ex('insert into %(ws_log)s (revId, oid, %(payloadCols)s) \n'
+        q =('insert into %(ws_log)s \n'
+            '    (revId, oid, %(payloadCols)s) \n'
+            '  select revId, oid, %(payloadCols)s \n'
+            '    from %(ws_view)s where oid=?;')
 
-        ns = self.ns; cur = self.cur
-        cur.execute(stmt%('insert',  ns.ws_log), data)
-        cur.execute(stmt%('replace', ns.qs_revlog), data)
+        r = ex(q % ns, (self.oid,))
+        self.seqId = seqId = r.lastrowid
+
+        cols[0:0] = ['seqId', 'grpId', 'oid', 'revId']
+        data[0:0] = [seqId, self.grpId, self.oid, self.revId]
+        q  = 'replace into %s (%s) values (%s)'
+        q %= (ns.ws_log, ','.join(cols), ('?,'*len(cols))[:-1])
+        ex(q, data)
+
+        self.updateRevlog(seqId)
+        return seqId
+
+    def updateRevlog(self, seqId):
+        q = ('replace into %(qs_revlog)s \n'
+             '  select revId, oid, %(payloadDefs)s \n'
+             '    from %(ws_log)s where seqId=?;')
+        r = self.cur.execute(q % self.ns, [seqId])
+        return seqId
 
     def updateManifest(self):
-        stmt  = '%s into %s \n'
+        stmt  = 'replace into %s \n'
         stmt += '  (versionId, oid, revId, flags) values (?,?,?,?)'
         data = (int(self.csWorking), self.oid, self.revId, self.flags)
 
         ns = self.ns; cur = self.cur
-        cur.execute(stmt%('replace', ns.ws_version), data)
-        cur.execute(stmt%('replace', ns.qs_manifest), data)
+        cur.execute(stmt % (ns.ws_version,), data)
+        cur.execute(stmt % (ns.qs_manifest,), data)
 
     #~ log queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def logFor(self, oid, seqId=None):
-        q = "select seqId, oid, revId from %(ws_log)s \n"
+        ns = self.ns; ex = self.cur.execute
+
         if oid is None:
             if seqId is None:
-                q += '  where oid=(select oid from %(ws_log)s where seqId=max(seqId)) \n'
+                r = ex('select max(seqId), oid from %(ws_log)s;' % ns)
             else:
-                q += '  where oid=(select oid from %(ws_log)s where seqId=?) \n'
-                args = (seqId,)
-        else:
-            if seqId is None:
-                q += '  where oid=? \n'
-                args = (oid,)
-            else:
-                q += '  where oid=? and seqId <= ?\n'
-                args = (oid, seqId)
+                r = ex('select seqId, oid from %(ws_log)s where seqId=?;' % ns, (seqId,))
 
-        q += '  order by seqId;'
-        return self.cur.execute(q % self.ns, args)
+            r = r.fetchone()
+            if r is not None:
+                seqId, oid = r
 
-    def oidForSeqId(self, seqId):
-        r = ex("select oid from %(ws_log)s where seqId=?;"%ns, (seqId,))
-        r = r.fetchone()
-        if r is not None:
-            return r[0]
-        else: return None
-
-    def lastLogEntry(self):
-        # find the last oid we modified
-        r = ex("select max(seqId), oid from %(ws_log)s;"%ns)
-        r = r.fetchone()
-        if r is None:
-            # there is no last action because the list is empty
-            r = (None, None)
-        return r
-
-    def lastLogByOid(self, oid):
-        if oid is None:
-            return self.lastLogEntry()
-
-        r = ex("select max(seqId), oid from %(ws_log)s where oid=?;"%ns, (oid,))
-        r = r.fetchone()
-        if r is None:
-            # there is no last change for the oid in question
-            r = (None, oid)
-        return r
-
-    def prevLogByOid(self, seqId, oid):
-        r = ex("select max(seqId), revId, oid, ts, %(payloadCols)s from %(ws_log)s where oid=? and seqId<?;"%ns, (oid, seqId))
-        return r.fetchone()
+        q  = "select seqId, grpId, oid, revId from %(ws_log)s \n"
+        q += "  where oid=? order by seqId asc;"
+        return ex(q % ns, (oid,))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -114,9 +97,9 @@ class Write(ChangeOpBase):
             raise ValueError("No data specified for revision")
 
         # TODO: Investigate and apply savepoint
-        self.updateDatalog(cols, data)
+        seqId = self.updateDatalog(cols, data)
         self.updateManifest()
-        return True
+        return seqId
 
 class Remove(ChangeOpBase):
     def perform(self, oid):
@@ -126,37 +109,13 @@ class Remove(ChangeOpBase):
         # we're reverting oid back to non-existance
         self.oid = oid
         self.revId = None
-        self.updateDatalog([],[])
+        seqId = self.updateDatalog([],[])
         self.updateManifest()
+        return seqId
 
 class Rollback(ChangeOpBase):
-    def perform(self, oid, seqId=None):
-        if seqId is None:
-            if oid is None:
-                return False
-            oid = self.oidForSeqId(seqId)
-        else:
-            seqId, oid = self.lastLogByOid(oid)
-        if oid is None:
-            return False
-
-        if seqId is not None: 
-            res = self.prevLogByOid(seqId, oid)
-        else: res = None
-
-        if res is not None:
-            # the last revision is in res
-            pass
-
-        else: 
-            # the last revision is in ws_version.ws_revId
-            delete
-
-
+    def perform(self, oid=None, seqId=None):
         self.oid = oid
-        self.revId = int(self.csWorking)
-
-        # TODO: Implement
-        return False
-        return True
+        for e in self.logFor(oid, seqId):
+            print zip(e.keys(), e)
 

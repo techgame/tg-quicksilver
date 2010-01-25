@@ -74,17 +74,25 @@ def main():
         print 'compressed:   %12i' % (len(raw.payload),)
         print
 
+    mark = True
     if root.data is None:
         print 'adding data:'
         root.data = myModule.myData
-        bs.mark(root)
-    elif 1:
+    elif 0:
         root.data.extend(myModule.genList(10))
-        bs.mark(root)
     elif 0:
         root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
     elif 0:
+        for x in xrange(200):
+            root.data.extend(myModule.genList(5))
+    elif 0:
         root.data.extend(myModule.genList(100))
+    else: 
+        mark = False
+
+    if mark:
+        print 'marking root modified'
+        bs.mark(root)
 
     with qsh:
         if 1:
@@ -92,7 +100,25 @@ def main():
         else:
             for entry, r in bs.iterSaveAll():
                 print 'save:', entry.oid, r
-        bs.commit()
+
+        if 1:
+            bs.commit()
+
+        else:
+            print "ws.rollback(None, None):"
+            ws.rollback(None, None)
+
+            print
+            print "ws.rollback(100, None):"
+            ws.rollback(100, None)
+
+            print
+            print "ws.rollback(None, 280)"
+            ws.rollback(None, 280)
+
+            print
+            print "ws.rollback(100, 280)"
+            ws.rollback(100, 280)
 
     stats = getattr(bs, 'stats', None)
     if stats is not None:

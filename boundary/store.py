@@ -88,9 +88,10 @@ class BoundaryStore(NotStorableMixin):
 
         if deferred:
             self._newEntries.append(entry)
-        else:
-            self._writeEntry(entry)
-            self._writeEntryCollection(self._iterNewEntries())
+            return oid
+
+        self._writeEntry(entry)
+        self._writeEntryCollection(self._iterNewEntries())
         return oid
 
     def delete(self, oid):
@@ -128,6 +129,9 @@ class BoundaryStore(NotStorableMixin):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Read and write entry workhorses
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def nextGroupId(self):
+        return self.ws.nextGroupId()
 
     def _hasEntry(self, entry):
         return self.ws.contains(entry.oid)
