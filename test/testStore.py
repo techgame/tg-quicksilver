@@ -78,7 +78,7 @@ def main():
     if root.data is None:
         print 'adding data:'
         root.data = myModule.myData
-    elif 0:
+    elif 1:
         root.data.extend(myModule.genList(10))
     elif 0:
         root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
@@ -102,9 +102,6 @@ def main():
                 print 'save:', entry.oid, r
 
         if 1:
-            bs.commit()
-
-        else:
             print "ws.rollback(None, None):"
             ws.rollback(None, None)
 
@@ -112,13 +109,9 @@ def main():
             print "ws.rollback(100, None):"
             ws.rollback(100, None)
 
-            print
-            print "ws.rollback(None, 280)"
-            ws.rollback(None, 280)
+        if 0:
+            bs.commit()
 
-            print
-            print "ws.rollback(100, 280)"
-            ws.rollback(100, 280)
 
     stats = getattr(bs, 'stats', None)
     if stats is not None:

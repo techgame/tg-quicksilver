@@ -25,48 +25,68 @@ class ChangeOpBase(OpBase):
     def perform(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
-    def updateDatalog(self, cols, data):
+    def updateDatalog(self, cols, data, copyForward=True):
         ex = self.cur.execute; ns = self.ns
+        oid = self.oid
 
-        #r = ex('insert into %(ws_log)s (revId, oid, %(payloadCols)s) \n'
-        q =('insert into %(ws_log)s \n'
-            '    (revId, oid, %(payloadCols)s) \n'
-            '  select revId, oid, %(payloadCols)s \n'
-            '    from %(ws_view)s where oid=?;')
+        seqId, isNew = self.newSeqIdEntry(oid, copyForward)
 
-        r = ex(q % ns, (self.oid,))
-        self.seqId = seqId = r.lastrowid
-
-        cols[0:0] = ['seqId', 'grpId', 'oid', 'revId']
-        data[0:0] = [seqId, self.grpId, self.oid, self.revId]
-        q  = 'replace into %s (%s) values (%s)'
-        q %= (ns.ws_log, ','.join(cols), ('?,'*len(cols))[:-1])
+        cols[0:0] = ['grpId', 'revId']
+        data[0:0] = [self.grpId, self.revId]
+        q  = ('update %s set %s where seqId=?')
+        q %= (ns.ws_log, ','.join('%s=?'%(c,) for c in cols))
+        data.append(seqId)
         ex(q, data)
 
-        self.updateRevlog(seqId)
+        self.updateRevLogFromSeqId(seqId)
+        self.updateManifest(isNew)
         return seqId
 
-    def updateRevlog(self, seqId):
+    def newSeqIdEntry(self, oid, copyForward=True):
+        ex = self.cur.execute; ns = self.ns
+        cols = ['revId', 'oid']
+        if copyForward:
+            cols.extend(ns.payload)
+        cols = ','.join(cols)
+
+        q =('insert into %s (%s) \n'
+            '  select %s \n'
+            '    from %s where oid=?;')
+        q %= (ns.ws_log, cols, cols, ns.ws_view)
+        r = ex(q, (oid,))
+        if r.rowcount != 0:
+            return r.lastrowid, False
+
+        r = ex('insert into %s (oid) values (?)'%ns.ws_log, (oid,))
+        return r.lastrowid, True
+
+    def updateRevLogFromSeqId(self, seqId):
         q = ('replace into %(qs_revlog)s \n'
              '  select revId, oid, %(payloadDefs)s \n'
              '    from %(ws_log)s where seqId=?;')
         r = self.cur.execute(q % self.ns, [seqId])
         return seqId
 
-    def updateManifest(self):
+    def updateManifest(self, isNew):
+        ns = self.ns; ex = self.cur.execute
         stmt  = 'replace into %s \n'
-        stmt += '  (versionId, oid, revId, flags) values (?,?,?,?)'
-        data = (int(self.csWorking), self.oid, self.revId, self.flags)
+        stmt += '  (versionId, revId, flags, oid) values (?,?,?,?)'
 
-        ns = self.ns; cur = self.cur
-        cur.execute(stmt % (ns.ws_version,), data)
-        cur.execute(stmt % (ns.qs_manifest,), data)
+        data = [int(self.csWorking), self.revId, self.flags, self.oid]
+
+        q = stmt
+        if not isNew:
+            q  = 'update %s set versionId=?, revId=?, flags=? where oid=?'
+
+        r = ex(q % (ns.ws_version,), data)
+        assert r.rowcount == 1, (r.rowcount, q, data)
+        r = ex(stmt % (ns.qs_manifest,), data)
+        assert r.rowcount == 1, (r.rowcount, stmt, data)
 
     #~ log queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def logFor(self, oid, seqId=None):
+    def logForOid(self, oid, seqId=None):
         ns = self.ns; ex = self.cur.execute
-
         if oid is None:
             if seqId is None:
                 r = ex('select max(seqId), oid from %(ws_log)s;' % ns)
@@ -77,9 +97,21 @@ class ChangeOpBase(OpBase):
             if r is not None:
                 seqId, oid = r
 
-        q  = "select seqId, grpId, oid, revId from %(ws_log)s \n"
-        q += "  where oid=? order by seqId asc;"
+        return self._logForOid(oid, ex, ns)
+
+    def _logForOid(self, oid, ex=None, ns=None):
+        if ex is None: ns = self.ns; ex = self.cur.execute
+        q = ("select seqId, grpId, oid, revId \n"
+            "  from %(ws_log)s\n"
+            "  where oid=? order by seqId asc;")
         return ex(q % ns, (oid,))
+
+    def logForGrpId(self, grpId, ex=None, ns=None):
+        if ex is None: ns = self.ns; ex = self.cur.execute
+        q = ("select seqId, grpId, oid, revId \n"
+            "  from %(ws_log)s\n"
+            "  where grpId=? order by seqId asc;")
+        return self.cur.execute(q % self.ns, (grpId,))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -98,7 +130,6 @@ class Write(ChangeOpBase):
 
         # TODO: Investigate and apply savepoint
         seqId = self.updateDatalog(cols, data)
-        self.updateManifest()
         return seqId
 
 class Remove(ChangeOpBase):
@@ -109,13 +140,17 @@ class Remove(ChangeOpBase):
         # we're reverting oid back to non-existance
         self.oid = oid
         self.revId = None
-        seqId = self.updateDatalog([],[])
-        self.updateManifest()
+        seqId = self.updateDatalog([], [], False)
         return seqId
 
 class Rollback(ChangeOpBase):
     def perform(self, oid=None, seqId=None):
         self.oid = oid
-        for e in self.logFor(oid, seqId):
+        for e in self.logForOid(oid, seqId):
             print zip(e.keys(), e)
+        print
+
+        for e in self.logForGrpId(None):
+            print zip(e.keys(), e)
+        print
 
