@@ -100,7 +100,7 @@ class VersionSchema(object):
               fullVersionId TEXT,
               state TEXT,
               branch TEXT,
-              ts TIMESTAMP,
+              ts TIMESTAMP default CURRENT_TIMESTAMP,
 
               parentId INTEGER,
               mergeId INTEGER,
