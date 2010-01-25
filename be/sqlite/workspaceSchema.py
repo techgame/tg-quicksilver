@@ -43,7 +43,7 @@ class WorkspaceSchema(object):
     def createCheckoutView(self, cur):
         cur.execute("""\
             create %(temp)s view if not exists %(ws_view)s as 
-              select oid, %(payloadCols)s
+              select revId, oid, %(payloadCols)s
               from %(ws_version)s as S
                 join %(qs_revlog)s using (revId, oid)
             ;""" % self.ns)
@@ -55,6 +55,7 @@ class WorkspaceSchema(object):
         cur.execute("""\
             create %(temp)s table if not exists %(ws_log)s (
               seqId INTEGER primary key autoincrement,
+              grpId INTEGER,
               revId INTEGER, 
               oid INTEGER not null,
               ts TIMESTAMP default CURRENT_TIMESTAMP,
