@@ -18,15 +18,15 @@ class BoundaryEntry(NotStorableMixin):
     RootProxy = RootProxy
     def __init__(self, oid):
         self.oid = oid
-        self.obj = None
-        self.dirty = False
         self.pxy = self.RootProxy()
+        self.setup(None, None)
 
     def setup(self, obj, hash):
         self.obj = obj
         self.hash = hash
         self.dirty = not hash
-        self.RootProxy.adaptProxy(self.pxy, obj)
+        if obj is not None:
+            self.RootProxy.adaptProxy(self.pxy, obj)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -170,7 +170,9 @@ class BoundaryStore(NotStorableMixin):
                 data = data.decode('zlib')
 
             obj = ambit.load(oid, data, record)
-            entry.setup(obj, bytes(record.hash))
+            hash = record.hash
+            if hash: hash = bytes(hash)
+            entry.setup(obj, hash)
             self._onRead(record, data, entry)
 
         self._objCache[entry.obj] = oid
@@ -190,24 +192,33 @@ class BoundaryStore(NotStorableMixin):
         if obj is None:
             return False, None
 
+        debugHashing = True #XXX
         with self.ambit() as ambit:
             data, hash = ambit.dump(oid, obj)
-            changed = (entry.hash != hash)
-            if changed:
-                entry.setup(obj, hash)
+
+            if isinstance(hash, bytes) and not debugHashing: #XXX
+                changed = (entry.hash != hash)
+                hash = buffer(hash)
+                task = None
+            else:
+                changed = None
+                task = hash
+                hash = None
+
+            if changed or task is not None: #XXX
                 payload = buffer(data.encode('zlib'))
                 self._onWrite(payload, data, entry)
-                if isinstance(hash, bytes):
-                    hash = buffer(hash)
-                    task = None
-                else:
-                    task = hash
-                    hash = None
 
                 seqId = self.ws.write(oid, payload=payload, hash=hash)
-                if not changed:
-                    print 'backout! seqId:', seqId
-                    self.ws.backout(seqId)
+                if task is not None:
+                    hash = task
+                    if entry.hash == hash:
+                        print 'backout seqId:', (seqId, entry.hash, hash)
+                        self.ws.backout(seqId)
+                    else:
+                        print 'accept seqId:', (seqId, entry.hash, hash)
+                        self.ws.postUpdate(seqId, hash=buffer(hash))
+                        entry.setup(obj, hash)
 
         return changed, len(data)
 

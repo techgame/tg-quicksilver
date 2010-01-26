@@ -93,9 +93,11 @@ def main():
         for x in xrange(200):
             e = random.choice(root.data)
             e.data.extend(myModule.genList(5))
-    elif 1:
+    elif 0:
         n = 0
-        population = random.sample(root.data, min(len(root.data), 200))
+        if len(root.data) < 50:
+            root.data.extend(myModule.genList(5))
+        population = random.sample(root.data, min(len(root.data), 50))
         random.shuffle(population)
         while population:
             e = population.pop()
@@ -103,7 +105,6 @@ def main():
                 random.shuffle(e.data)
                 #e.data.append(myModule.genList(1, [myModule.A, myModule.B]))
             else:
-                continue
                 e.data.extend(myModule.genList(5))
 
             try: bs.mark(e)
@@ -117,6 +118,7 @@ def main():
         print 'marking root modified'
         bs.mark(root)
 
+    bs.saveDirtyOnly = False
     with qsh:
         if 1:
             bs.saveAll()

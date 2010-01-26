@@ -170,6 +170,9 @@ class Workspace(WorkspaceBase):
     def backout(self, seqId):
         op = Ops.Backout(self)
         return op.perform(seqId)
+    def postUpdate(self, seqId, **data):
+        op = Ops.PostUpdate(self)
+        return op.perform(seqId, data)
 
     def remove(self, oid):
         if oid is None:

@@ -33,11 +33,7 @@ class ChangeOpBase(OpBase):
 
         cols[0:0] = ['grpId', 'revId']
         data[0:0] = [self.grpId, self.revId]
-        q  = ('update %s set %s where seqId=?')
-        q %= (ns.ws_log, ','.join('%s=?'%(c,) for c in cols))
-        data.append(seqId)
-        ex(q, data)
-
+        self.updateLogEntry(seqId, cols, data)
         self.updateRevLogFromSeqId(seqId)
         self.updateManifest(isNew)
         return seqId
@@ -60,12 +56,19 @@ class ChangeOpBase(OpBase):
         r = ex('insert into %s (oid) values (?)'%ns.ws_log, (oid,))
         return r.lastrowid, True
 
+    def updateLogEntry(self, seqId, cols, data):
+        ex = self.cur.execute; ns = self.ns
+        q  = ('update %s set %s where seqId=?')
+        q %= (ns.ws_log, ','.join('%s=?'%(c,) for c in cols))
+        r = ex(q, data + [seqId])
+        return r.rowcount
+
     def updateRevLogFromSeqId(self, seqId):
         q = ('replace into %(qs_revlog)s \n'
              '  select revId, oid, %(payloadDefs)s \n'
              '    from %(ws_log)s where seqId=?;')
         r = self.cur.execute(q % self.ns, [seqId])
-        return seqId
+        return r.rowcount
 
     def updateManifest(self, isNew):
         ns = self.ns; ex = self.cur.execute
@@ -84,6 +87,13 @@ class ChangeOpBase(OpBase):
         assert r.rowcount == 1, (r.rowcount, stmt, data)
 
     #~ log queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def oidForSeqId(self, seqId):
+        q = 'select oid from %(ws_log)s where seqId=?'
+        r = self.cur.execute(q% self.ns, (seqId,))
+        r = r.fetchone()
+        if r is not None:
+            return r[0]
 
     def logForOid(self, oid, seqId=None):
         ns = self.ns; ex = self.cur.execute
@@ -153,6 +163,22 @@ class Remove(ChangeOpBase):
         self.oid = oid
         self.revId = None
         seqId = self.updateDatalog([], [], False)
+        return seqId
+
+class PostUpdate(ChangeOpBase):
+    def perform(self, seqId, kwData):
+        self.oid = self.oidForSeqId(seqId)
+        self.revId = int(self.csWorking)
+
+        cols, data = splitColumnData(kwData, self.ns.payload)
+        if kwData: 
+            raise ValueError("Unknown keys: %s" % (data.keys(),))
+        if not data:
+            raise ValueError("No data specified for revision")
+
+        print 'updateLogEntry:', (seqId, cols, data)
+        self.updateLogEntry(seqId, cols, data)
+        self.updateRevLogFromSeqId(seqId)
         return seqId
 
 class Backout(ChangeOpBase):
