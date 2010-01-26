@@ -57,8 +57,8 @@ class BaseAmbitStrategy(NotStorableMixin):
         self._targetOid = None
         return obj
 
-    def _objForRef(self, ref):
-        return self.host.get(ref)
+    def _objForRef(self, oid):
+        return self.host.ref(oid)
 
     def _refForObj(self, obj):
         if isinstance(obj, type): 

@@ -18,7 +18,8 @@ class BoundaryEntry(NotStorableMixin):
     RootProxy = RootProxy
     def __init__(self, oid):
         self.oid = oid
-        self.dirty = True
+        self.obj = None
+        self.dirty = False
         self.pxy = self.RootProxy()
 
     def setup(self, obj, hash):
@@ -53,19 +54,28 @@ class BoundaryStore(NotStorableMixin):
         yield a
         ambitList.append(a)
 
-    def get(self, oid, default=NotImplemented, deferred=False):
-        r = self._cache.get(oid, self)
-        if r is not self:
-            return r.pxy
-
-        entry = BoundaryEntry(oid)
-        if not deferred and self._readEntry(entry):
+    def ref(self, oid):
+        entry = self._cache.get(oid, self)
+        if entry is not self:
             return entry.pxy
-        elif deferred and self._hasEntry(entry):
+        else: entry = BoundaryEntry(oid)
+
+        if self._hasEntry(entry):
+            # TODO: remove readEntry when implemented
+            self._readEntry(entry)
+            return entry.pxy
+        else: return None
+
+    def get(self, oid, default=NotImplemented):
+        entry = self._cache.get(oid, self)
+        if entry is not self:
+            if entry.obj is not None:
+                return entry.pxy
+        else: entry = BoundaryEntry(oid)
+
+        if self._readEntry(entry):
             return entry.pxy
         elif default is NotImplemented:
-            for k in self._cache.keys():
-                print k
             raise LookupError("No object found for oid: %r" % (oid,), oid)
         return default
 
@@ -134,7 +144,13 @@ class BoundaryStore(NotStorableMixin):
         return self.ws.nextGroupId()
 
     def _hasEntry(self, entry):
-        return self.ws.contains(entry.oid)
+        if not self.ws.contains(entry.oid):
+            return False
+
+        oid = entry.oid
+        self._cache[oid] = entry
+        self._objCache[entry.pxy] = oid
+        return True
 
     def _readEntry(self, entry):
         oid = entry.oid
@@ -169,11 +185,16 @@ class BoundaryStore(NotStorableMixin):
         if not self._checkWriteEntry(entry):
             return False, None
 
+        oid = entry.oid
+        obj = entry.obj
+        if obj is None:
+            return False, None
+
         with self.ambit() as ambit:
-            data, hash = ambit.dump(entry.oid, entry.obj)
+            data, hash = ambit.dump(oid, obj)
             changed = (entry.hash != hash)
             if changed:
-                entry.setup(entry.obj, hash)
+                entry.setup(obj, hash)
                 payload = buffer(data.encode('zlib'))
                 self._onWrite(payload, data, entry)
                 if isinstance(hash, bytes):
@@ -183,7 +204,10 @@ class BoundaryStore(NotStorableMixin):
                     task = hash
                     hash = None
 
-                seqId = self.ws.write(entry.oid, payload=payload, hash=hash)
+                seqId = self.ws.write(oid, payload=payload, hash=hash)
+                if not changed:
+                    print 'backout! seqId:', seqId
+                    self.ws.backout(seqId)
 
         return changed, len(data)
 
