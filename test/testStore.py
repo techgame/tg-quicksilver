@@ -3,10 +3,12 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import timeit
+import random
 import myModule
 
 from TG.quicksilver.be.sqlite import Versions
 from TG.quicksilver.boundary import BoundaryStore, StatsBoundaryStore
+random.seed()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -54,7 +56,7 @@ def main():
     root = bs.get(100, None)
     if root is None:
         root = myModule.Root()
-        root.data = None
+        root.data = []
         bs.set(100, root)
         bs.saveAll()
         bs.commit()
@@ -75,10 +77,10 @@ def main():
         print
 
     mark = True
-    if root.data is None:
+    if not root.data:
         print 'adding data:'
         root.data = myModule.myData
-    elif 1:
+    elif 0:
         root.data.extend(myModule.genList(10))
     elif 0:
         root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
@@ -87,6 +89,27 @@ def main():
             root.data.extend(myModule.genList(5))
     elif 0:
         root.data.extend(myModule.genList(100))
+    elif 0:
+        for x in xrange(200):
+            e = random.choice(root.data)
+            e.data.extend(myModule.genList(5))
+    elif 1:
+        n = 0
+        population = random.sample(root.data, min(len(root.data), 200))
+        random.shuffle(population)
+        while population:
+            e = population.pop()
+            if len(e.data)>4:
+                random.shuffle(e.data)
+                #e.data.append(myModule.genList(1, [myModule.A, myModule.B]))
+            else:
+                continue
+                e.data.extend(myModule.genList(5))
+
+            try: bs.mark(e)
+            except LookupError: pass
+            else: n += 1
+        print 'items shuffled:', n
     else: 
         mark = False
 
@@ -101,15 +124,11 @@ def main():
             for entry, r in bs.iterSaveAll():
                 print 'save:', entry.oid, r
 
-        if 1:
-            print "ws.rollback(None, None):"
-            ws.rollback(None, None)
-
-            print
-            print "ws.rollback(100, None):"
-            ws.rollback(100, None)
-
         if 0:
+            print "ws.backout(None):"
+            ws.backout(None)
+
+        if 1:
             bs.commit()
 
 

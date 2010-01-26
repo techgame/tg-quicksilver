@@ -119,6 +119,11 @@ class Workspace(WorkspaceBase):
     #~ OID data operations
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def contains(self, oid):
+        q = "select oid from %(ws_view)s where oid=? limit 1;" % self.ns
+        res = self.conn.execute(q, (oid,))
+        return res.fetchone() is not None
+
     def read(self, oid, asNS=True):
         ns = self.ns
         q = "select oid, %(payloadCols)s from %(ws_view)s where oid=?" % ns
@@ -162,9 +167,9 @@ class Workspace(WorkspaceBase):
         op = Ops.Write(self)
         return op.perform(oid, data)
 
-    def rollback(self, oid=None, seqId=None):
-        op = Ops.Rollback(self)
-        return op.perform(oid, seqId)
+    def backout(self, seqId):
+        op = Ops.Backout(self)
+        return op.perform(seqId)
 
     def remove(self, oid):
         if oid is None:

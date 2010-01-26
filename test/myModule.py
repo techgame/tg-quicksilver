@@ -43,6 +43,7 @@ def connect(l):
         e.idx = i
         e.prev = l[(i-1)%len(l)]
         e.post = l[(i+1)%len(l)]
+        e.data = []
 
 def genList(n, kl=[A,B,C]):
     l = []

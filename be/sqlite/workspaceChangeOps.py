@@ -113,6 +113,18 @@ class ChangeOpBase(OpBase):
             "  where grpId=? order by seqId asc;")
         return self.cur.execute(q % self.ns, (grpId,))
 
+    def logForSeqId(self, seqId):
+        ns = self.ns; ex = self.cur.execute
+        if seqId is None:
+            r = ex('select max(seqId), oid from %(ws_log)s;' % ns)
+        else:
+            r = ex('select seqId, oid from %(ws_log)s where seqId=?;' % ns, (seqId,))
+
+        r = r.fetchone()
+        if r is not None:
+            seqId, oid = r
+        return self._logForOid(oid, ex, ns)
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Write(ChangeOpBase):
@@ -143,14 +155,15 @@ class Remove(ChangeOpBase):
         seqId = self.updateDatalog([], [], False)
         return seqId
 
-class Rollback(ChangeOpBase):
-    def perform(self, oid=None, seqId=None):
-        self.oid = oid
-        for e in self.logForOid(oid, seqId):
-            print zip(e.keys(), e)
-        print
-
-        for e in self.logForGrpId(None):
-            print zip(e.keys(), e)
-        print
+class Backout(ChangeOpBase):
+    def perform(self, seqId):
+        log = list(self.logForSeqId(seqId))
+        if len(log) == 1:
+            print seqId, 'remove and revert to revlog'
+            print log
+        elif log:
+            print seqId, 'remove and revert'
+            print log
+        else:
+            print seqId, 'not present?'
 
