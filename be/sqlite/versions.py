@@ -41,15 +41,13 @@ class Versions(VersionsAbstract):
             raise RuntimeError("Database is already loaded")
 
         if isinstance(db, basestring):
-            conn = sqlite3.connect(
-                    db, 
-                    isolation_level='DEFERRED',
-                    detect_types=sqlite3.PARSE_DECLTYPES,
-                    )
+            conn = sqlite3.connect(db,
+                    isolation_level=None,
+                    detect_types=sqlite3.PARSE_DECLTYPES)
         else:
             db.executemany # ducktype test
             conn = db
-            conn.isolation_level = 'DEFERRED'
+            conn.isolation_level = None
 
         conn.row_factory = sqlite3.Row
         self.conn = conn
@@ -63,9 +61,13 @@ class Versions(VersionsAbstract):
         schema.initOidSpace(self)
 
     def __enter__(self):
-        return self.conn.__enter__()
+        self.conn.execute('BEGIN TRANSACTION')
+
     def __exit__(self, excType, exc, tb):
-        return self.conn.__exit__(excType, exc, tb)
+        if excType is None:
+            self.conn.commit()
+        else:
+            self.conn.rollback()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Example verisons extension with more columns

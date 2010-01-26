@@ -47,12 +47,25 @@ class VersionSchema(object):
 
     def initStore(self, conn):
         self.cur = conn.cursor()
+        self.initPragmas(conn)
         with conn:
             self.createRevisionlog()
             self.createManifest()
             self.createChangesets()
             self.createView()
             self.createMeta()
+
+    pragmas = {
+        'synchronous': 'NORMAL',    # OFF | NORMAL | FULL
+        'temp_store': 'MEMORY',     # DEFAULT | FILE | MEMORY
+        'encoding': '"UTF-8"',
+        }
+
+    def initPragmas(self, conn):
+        pragmas = self.pragmas.items()
+        pragmas.sort()
+        pragmas = '\n'.join('PRAGMA %s = %s;' % e for e in pragmas)
+        conn.executescript(pragmas)
 
     def createRevisionlog(self):
         self.cur.execute("""\
