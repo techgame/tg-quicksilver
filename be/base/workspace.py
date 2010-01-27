@@ -2,6 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+from .errors import WorkspaceError
 from ...mixins import NotStorableMixin
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -94,7 +95,7 @@ class WorkspaceBase(NotStorableMixin):
         if kw: cs.update(kw)
         self.publishChanges()
         self.clearChangeLog()
-        cs.updateState('closed', remove='open')
+        cs.closeChangeset()
         self.csWorking = None
         self.csCheckout = cs
         self._updateCurrentChangeset(cs)

@@ -39,7 +39,7 @@ class ChangesetAbstract(NotStorableMixin):
         if not self._initialized:
             return "<%s ref|%x>" % (name, self.versionId or 0)
         else:
-            return "<%s %s|%x at %s>" % (name, self.state, self.versionId, self.ts)
+            return "<%s {%s}|%x at %s>" % (name, ''.join(self.state), self.versionId, self.ts)
 
     def __cmp__(self, other): 
         return cmp(self.versionId, other.versionId)
@@ -227,6 +227,9 @@ class ChangesetAbstract(NotStorableMixin):
             return self.init(force=True)
 
         return self._setChangesetAttrs(items)
+
+    def closeChangeset(self):
+        self.updateState('closed', remove='open')
 
     def markChangeset(self, state='mark'):
         self.updateState('mark')
