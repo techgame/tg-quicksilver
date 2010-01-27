@@ -128,8 +128,8 @@ class Workspace(WorkspaceBase):
              '    from %(ws_version)s where seqId notnull;')
         r = ex(q%ns)
         nPtrs = r.rowcount
-
-        assert nPtrs == nLog, (nPtrs, nLog)
+        if nPtrs != nLog:
+            raise RuntimeError("Changes to revision log (%s) did not equal the changes to the version table(%s) " % (nLog, nPtrs))
 
         self.clearLog()
 
