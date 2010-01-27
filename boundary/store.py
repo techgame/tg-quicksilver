@@ -131,7 +131,7 @@ class BoundaryStore(NotStorableMixin):
                 # zlib encoded
                 data = data.decode('zlib')
             self._onRead(record, data, None)
-            record.payload = data
+            record = record._replace(payload=buffer(data))
         else:
             self._onRead(record, None, None)
         return record

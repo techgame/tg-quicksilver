@@ -21,7 +21,7 @@ class Workspace(WorkspaceBase):
     metadataView = metadata.metadataView
     temporary = False
 
-    def __init__(self, host, wsid='main'):
+    def __init__(self, host, wsid=None):
         self.setHost(host)
         self.wsid = wsid
         self._initSchema()
@@ -40,6 +40,9 @@ class Workspace(WorkspaceBase):
     def _initSchema(self):
         schema = self.Schema(self.ns, self)
         schema.initStore(self.conn)
+
+        self.DataTuple = schema.newDataTuple()
+        self.asDataTuple = self.DataTuple._make
 
     def _initStoredCS(self):
         cs = self.readCurrentChangeset()
@@ -145,7 +148,7 @@ class Workspace(WorkspaceBase):
         r = self.conn.execute(q, (oid,))
         return r.fetchone() is not None
 
-    def read(self, oid, asNS=True):
+    def read(self, oid):
         ex = self.conn.execute; ns = self.ns
 
         q = "select seqId, revId from %(ws_version)s where oid=?"
@@ -161,13 +164,9 @@ class Workspace(WorkspaceBase):
             q += "%(qs_revlog)s where oid=? and revId=?"
             r = ex(q % ns, (oid,revId))
 
-        if asNS:
-            r = self._rowsAsNS(r, ns)
-            return next(r, None)
-        else: return r.fetchone()
-
-    def _rowsAsNS(self, res, ns):
-        return (ns.new(dict(zip(e.keys(), e))) for e in res)
+        r = r.fetchone()
+        if r is not None:
+            return self.asDataTuple(r)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -208,7 +207,7 @@ class Workspace(WorkspaceBase):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def workspaceView(host, wsid='main'):
+def workspaceView(host, wsid=None):
     return Workspace(host, wsid)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
