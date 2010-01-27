@@ -85,8 +85,8 @@ class WorkspaceBase(NotStorableMixin):
         ns = self.ns
 
         if kw: cs.update(kw)
+        self._publishChanges()
         cs.updateState('closed')
-        self.clearLog()
         self.csWorking = None
         self.csCheckout = cs
         self._updateCurrentChangeset(cs)
@@ -96,16 +96,21 @@ class WorkspaceBase(NotStorableMixin):
 
     def revertAll(self):
         cs = self.getCSWorking(False)
+        self._revertChanges()
         if cs is not None:
             cs.revert()
         self.csWorking = None
+        self._updateCurrentChangeset(self.cs)
+
+    def _revertChanges(self):
         self.clearLog()
         self.clearWorkspace()
-        self._updateCurrentChangeset(self.cs)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ template methods to effect workspace ~~~~~~~~~~~~~
 
+    def _publishChanges(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def _updateCurrentChangeset(self, cs):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def fetchVersions(self, cs):

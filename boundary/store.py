@@ -192,7 +192,7 @@ class BoundaryStore(NotStorableMixin):
         if obj is None:
             return False, None
 
-        debugHashing = True #XXX
+        debugHashing = False #XXX
         with self.ambit() as ambit:
             data, hash = ambit.dump(oid, obj)
 

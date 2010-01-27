@@ -77,8 +77,9 @@ class Workspace(WorkspaceBase):
     #~ overridden template methods ~~~~~~~~~~~~~~~~~~~~~~
 
     def _updateCurrentChangeset(self, cs):
+        r = self.saveCurrentChangeset(cs)
         self.tagRevIds()
-        return self.saveCurrentChangeset(cs)
+        return r
 
     def _iterLineageToState(self, cs, state='mark'):
         if cs is None: 
@@ -88,29 +89,49 @@ class Workspace(WorkspaceBase):
             if s == state:
                 break
     def fetchVersions(self, cs):
+        cur = self.cur; ns = self.ns
         versions = self._iterLineageToState(cs, 'mark')
-        res = self.cur.executemany("""\
+        r = cur.executemany("""\
             insert or ignore into %(ws_version)s
-                select * from %(qs_manifest)s
-                    where versionId=?;""" % self.ns, versions)
-        return res
-
-    def tagRevIds(self):
-        self.cur.execute("update %(ws_version)s set ws_revId=revId;"%self.ns)
+                select * from %(qs_version)s
+                    where versionId=?;""" % ns, versions)
+        return r.rowcount
 
     def clearWorkspace(self):
         self.checkCommited()
 
-        ns = self.ns
-        ex = self.cur.execute
+        ex = self.cur.execute; ns = self.ns
         n, = ex("select count(seqId) from %(ws_log)s;"%ns).fetchone()
         if n:
             raise WorkspaceError("Uncommited workspace log items")
 
         ex("delete from %(ws_version)s;"%ns)
 
+    def tagRevIds(self):
+        self.cur.execute("update %(ws_version)s set ws_versionId=versionId, ws_revId=revId;"%self.ns)
     def clearLog(self):
-        self.cur.execute("delete from %(ws_log)s;" % self.ns)
+        ex = self.cur.execute; ns = self.ns
+        ex("update %(ws_version)s set seqId=null,flags=0,ws_versionId=versionId,ws_revId=revId;" % ns)
+        ex("delete from %(ws_log)s;" % ns)
+        #self.tagRevIds()
+
+    def _publishChanges(self):
+        ex = self.cur.execute; ns = self.ns
+        q = ('insert into %(qs_revlog)s (revId, oid, %(payloadCols)s) \n'
+             '  select L.revId, L.oid, %(payloadCols)s from %(ws_log)s as L \n'
+             '    inner join %(ws_version)s using (seqId)')
+        r = ex(q%ns)
+        nLog = r.rowcount
+
+        q = ('insert into %(qs_version)s (versionId, revId, oid, flags) \n'
+             '  select versionId, revId, oid, 1 as flags \n'
+             '    from %(ws_version)s where seqId notnull;')
+        r = ex(q%ns)
+        nPtrs = r.rowcount
+
+        assert nPtrs == nLog, (nPtrs, nLog)
+
+        self.clearLog()
 
     def _dbCommit(self):
         self.conn.commit()
@@ -120,25 +141,30 @@ class Workspace(WorkspaceBase):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def contains(self, oid):
-        q = "select oid from %(ws_view)s where oid=? limit 1;" % self.ns
-        res = self.conn.execute(q, (oid,))
-        return res.fetchone() is not None
+        q = "select oid from %(ws_version)s where oid=? limit 1;" % self.ns
+        r = self.conn.execute(q, (oid,))
+        return r.fetchone() is not None
 
     def read(self, oid, asNS=True):
-        ns = self.ns
-        q = "select oid, %(payloadCols)s from %(ws_view)s where oid=?" % ns
-        res = self.conn.execute(q, (oid,))
-        if asNS:
-            res = self._rowsAsNS(res, ns)
-        return next(res, None)
+        ex = self.conn.execute; ns = self.ns
 
-    def readAll(self, asNS=True):
-        ns = self.ns
-        q = "select oid, %(payloadCols)s from %(ws_view)s" % ns
-        res = self.conn.execute(q)
+        q = "select seqId, revId from %(ws_version)s where oid=?"
+        r = ex(q % ns, (oid,)).fetchone()
+        if r is None: return None
+        seqId, revId = r
+
+        q = "select oid, %(payloadCols)s from \n  "
+        if seqId is not None:
+            q += "%(ws_log)s where seqId=? and oid=?"
+            r = ex(q % ns, (seqId,oid))
+        else:
+            q += "%(qs_revlog)s where oid=? and revId=?"
+            r = ex(q % ns, (oid,revId))
+
         if asNS:
-            res = self._rowsAsNS(res, ns)
-        return res
+            r = self._rowsAsNS(r, ns)
+            return next(r, None)
+        else: return r.fetchone()
 
     def _rowsAsNS(self, res, ns):
         return (ns.new(dict(zip(e.keys(), e))) for e in res)

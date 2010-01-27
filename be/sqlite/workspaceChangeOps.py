@@ -10,7 +10,6 @@ from .utils import OpBase
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class ChangeOpBase(OpBase):
-    flags = 2
     csWorking = None
 
     def __init__(self, host):
@@ -25,7 +24,7 @@ class ChangeOpBase(OpBase):
     def perform(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
-    def updateDatalog(self, cols, data, copyForward=True):
+    def addLogEntry(self, cols, data, copyForward=True):
         ex = self.cur.execute; ns = self.ns
         oid = self.oid
 
@@ -34,8 +33,7 @@ class ChangeOpBase(OpBase):
         cols[0:0] = ['grpId', 'revId']
         data[0:0] = [self.grpId, self.revId]
         self.updateLogEntry(seqId, cols, data)
-        self.updateRevLogFromSeqId(seqId)
-        self.updateManifest(isNew)
+        self.updateVersions(oid, seqId, isNew)
         return seqId
 
     def newSeqIdEntry(self, oid, copyForward=True):
@@ -45,16 +43,22 @@ class ChangeOpBase(OpBase):
             cols.extend(ns.payload)
         cols = ','.join(cols)
 
-        q =('insert into %s (%s) \n'
-            '  select %s \n'
-            '    from %s where oid=?;')
-        q %= (ns.ws_log, cols, cols, ns.ws_view)
-        r = ex(q, (oid,))
-        if r.rowcount != 0:
-            return r.lastrowid, False
+        q = "select seqId, revId from %(ws_version)s where oid=?"
+        r = ex(q % ns, (oid,)).fetchone()
+        if r is None: 
+            r = ex('insert into %s (oid) values (?)'%ns.ws_log, (oid,))
+            return r.lastrowid, True
 
-        r = ex('insert into %s (oid) values (?)'%ns.ws_log, (oid,))
-        return r.lastrowid, True
+        seqId, revId = r
+        q = 'insert into %s (%s) select %s ' % (ns.ws_log, cols, cols)
+
+        if seqId is not None:
+            q += 'from %s where seqId=? and oid=?' % ns.ws_log
+            r = ex(q, (seqId, oid))
+        else:
+            q += 'from %s where oid=? and revId=?' % ns.qs_revlog
+            r = ex(q, (oid, revId))
+        return r.lastrowid, False
 
     def updateLogEntry(self, seqId, cols, data):
         ex = self.cur.execute; ns = self.ns
@@ -63,29 +67,28 @@ class ChangeOpBase(OpBase):
         r = ex(q, data + [seqId])
         return r.rowcount
 
-    def updateRevLogFromSeqId(self, seqId):
-        q = ('replace into %(qs_revlog)s \n'
-             '  select revId, oid, %(payloadDefs)s \n'
-             '    from %(ws_log)s where seqId=?;')
-        r = self.cur.execute(q % self.ns, [seqId])
-        return r.rowcount
-
-    def updateManifest(self, isNew):
+    def updateVersions(self, oid, seqId, isNew):
         ns = self.ns; ex = self.cur.execute
-        stmt  = 'replace into %s \n'
-        stmt += '  (versionId, revId, flags, oid) values (?,?,?,?)'
-
-        data = [int(self.csWorking), self.revId, self.flags, self.oid]
-
-        q = stmt
-        if not isNew:
-            q  = 'update %s set versionId=?, revId=?, flags=? where oid=?'
+        verId = int(self.csWorking)
+        if isNew:
+            q = ('replace into %s (oid, versionId, revId, seqId) values (?,?,?,?)')
+            data = [oid, verId, self.revId, seqId]
+        elif seqId is not None:
+            q = ('update %s set versionId=?,revId=?,seqId=? where oid=?')
+            data = [verId, self.revId, seqId, oid]
+        else:
+            # revert back to ws_versionId and ws_revId
+            q = ('update %s set versionId=ws_versionId,revId=ws_revId,seqId=null where oid=?')
+            data = [oid]
 
         r = ex(q % (ns.ws_version,), data)
-        assert r.rowcount == 1, (r.rowcount, q, data)
-        r = ex(stmt % (ns.qs_manifest,), data)
-        assert r.rowcount == 1, (r.rowcount, stmt, data)
+        return r.rowcount
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ Log-oriented operations
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class ChangeLogOpBase(ChangeOpBase):
     #~ log queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def oidForSeqId(self, seqId):
@@ -136,6 +139,8 @@ class ChangeOpBase(OpBase):
         return self._logForOid(oid, ex, ns)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ Workhorse ChangeOps
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Write(ChangeOpBase):
     def perform(self, oid, kwData):
@@ -151,7 +156,7 @@ class Write(ChangeOpBase):
             raise ValueError("No data specified for revision")
 
         # TODO: Investigate and apply savepoint
-        seqId = self.updateDatalog(cols, data)
+        seqId = self.addLogEntry(cols, data)
         return seqId
 
 class Remove(ChangeOpBase):
@@ -162,10 +167,10 @@ class Remove(ChangeOpBase):
         # we're reverting oid back to non-existance
         self.oid = oid
         self.revId = None
-        seqId = self.updateDatalog([], [], False)
+        seqId = self.addLogEntry([], [], False)
         return seqId
 
-class PostUpdate(ChangeOpBase):
+class PostUpdate(ChangeLogOpBase):
     def perform(self, seqId, kwData):
         self.oid = self.oidForSeqId(seqId)
         self.revId = int(self.csWorking)
@@ -178,18 +183,21 @@ class PostUpdate(ChangeOpBase):
 
         print 'updateLogEntry:', (seqId, cols, data)
         self.updateLogEntry(seqId, cols, data)
-        self.updateRevLogFromSeqId(seqId)
         return seqId
 
-class Backout(ChangeOpBase):
+class Backout(ChangeLogOpBase):
     def perform(self, seqId):
-        log = list(self.logForSeqId(seqId))
-        if len(log) == 1:
-            print seqId, 'remove and revert to revlog'
-            print log
-        elif log:
-            print seqId, 'remove and revert'
-            print log
-        else:
-            print seqId, 'not present?'
+        ex = self.cur.execute; ns = self.ns
+        self.oid = oid = self.oidForSeqId(seqId)
+
+        r = ex("delete from %(ws_log)s where seqId=?"%ns, (seqId,))
+        print r.rowcount
+        if r.rowcount == 0:
+            return False
+
+        r = ex("select max(seqId) from %(ws_log)s where oid=?"%ns, (oid,)).fetchone()
+        if r is None: seqId = r
+        else: seqId = r[0]
+
+        self.updateVersions(oid, seqId, False)
 

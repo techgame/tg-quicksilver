@@ -7,7 +7,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class WorkspaceSchema(object):
-    sqlObjects = ['ws_log', 'ws_version', 'ws_view']
+    sqlObjects = ['ws_log', 'ws_version']
 
     def __init__(self, ns, workspace):
         self.ns = ns
@@ -27,45 +27,39 @@ class WorkspaceSchema(object):
         with conn:
             cur = conn.cursor()
             self.createWorking(cur)
-            self.createCheckoutView(cur)
             self.createChangesetLog(cur)
 
     def createWorking(self, cur):
         cur.execute("""\
             create %(temp)s table if not exists %(ws_version)s (
-              versionId INTEGER,
               oid INTEGER primary key,
               revId INTEGER,
+              versionId INTEGER,
+              flags INTEGER,
+
+              ws_versionId INTEGER,
               ws_revId INTEGER,
-              flags INTEGER
-            );""" % self.ns)
-
-    def createCheckoutView(self, cur):
-        cur.execute("""\
-            create %(temp)s view if not exists %(ws_view)s as 
-              select revId, oid, %(payloadCols)s
-              from %(ws_version)s as S
-                join %(qs_revlog)s using (revId, oid)
-            ;""" % self.ns)
-
+              seqId INTEGER);""" % self.ns)
 
     def createChangesetLog(self, cur):
         '''Used ChangesetLog to implement undo/redo in a workspace'''
 
         cur.execute("""\
             create %(temp)s table if not exists %(ws_log)s (
+              oid INTEGER not null,
+              revId INTEGER, 
+
               seqId INTEGER primary key autoincrement,
               grpId INTEGER,
-              revId INTEGER, 
-              oid INTEGER not null,
-              ts TIMESTAMP default CURRENT_TIMESTAMP,
 
-              %(payloadDefs)s
-              );""" % self.ns);
+              %(payloadDefs)s);""" % self.ns);
+
+        cur.execute("""\
+            create index if not exists %(ws_log)s_index 
+                on %(ws_log)s (oid);""" % self.ns)
               
     def dropWorkspace(self, cur):
         ns = self.ns
-        cur.execute("drop view if exists %(ws_view)s;" % ns)
         cur.execute("drop table if exists %(ws_log)s;" % ns)
         cur.execute("drop table if exists %(ws_version)s;" % ns)
 

@@ -17,7 +17,7 @@ class VersionSchema(object):
     sqlObjects = [
         'qs_changesets',
         'qs_revlog',
-        'qs_manifest',
+        'qs_version',
         'qs_view',
         'qs_meta', ]
 
@@ -70,8 +70,8 @@ class VersionSchema(object):
     def createRevisionlog(self):
         self.cur.execute("""\
             create table if not exists %(qs_revlog)s (
-              revId INTEGER, 
               oid INTEGER not null,
+              revId INTEGER, 
 
               %(payloadDefs)s,
               
@@ -83,22 +83,22 @@ class VersionSchema(object):
     def createManifest(self):
         ns = self.ns
         self.cur.execute("""\
-            create table if not exists %(qs_manifest)s (
-              versionId INTEGER,
+            create table if not exists %(qs_version)s (
               oid INTEGER,
               revId INTEGER,
+              versionId INTEGER,
               flags INTEGER,
 
               primary key (versionId, oid) on conflict replace
             );""" % ns)
         self.cur.execute("""\
-            create index if not exists %(qs_manifest)s_index 
-                on %(qs_manifest)s (versionId);""" % ns)
+            create index if not exists %(qs_version)s_index 
+                on %(qs_version)s (versionId);""" % ns)
 
     def createView(self):
         self.cur.execute("""\
             create view if not exists %(qs_view)s as 
-              select * from %(qs_manifest)s as S
+              select * from %(qs_version)s as S
                 join %(qs_revlog)s using (revId, oid)
             ;""" % self.ns)
                 
@@ -119,8 +119,7 @@ class VersionSchema(object):
               mergeId INTEGER,
               mergeFlags TEXT%s
 
-              %s
-            );""" % (ns.qs_changesets, comma, defs))
+              %s);""" % (ns.qs_changesets, comma, defs))
         self.addColumnsTo('qs_changesets', 'changeset')
 
     def createMeta(self):
@@ -129,8 +128,7 @@ class VersionSchema(object):
                 name text not null,
                 idx,
                 value,
-                primary key (name, idx)
-            );""" % self.ns)
+                primary key (name, idx));""" % self.ns)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

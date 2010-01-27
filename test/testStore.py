@@ -80,7 +80,7 @@ def main():
     if not root.data:
         print 'adding data:'
         root.data = myModule.myData
-    elif 0:
+    elif 1:
         root.data.extend(myModule.genList(10))
     elif 0:
         root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
