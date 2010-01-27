@@ -181,7 +181,6 @@ class PostUpdate(ChangeLogOpBase):
         if not data:
             raise ValueError("No data specified for revision")
 
-        print 'updateLogEntry:', (seqId, cols, data)
         self.updateLogEntry(seqId, cols, data)
         return seqId
 
@@ -189,15 +188,17 @@ class Backout(ChangeLogOpBase):
     def perform(self, seqId):
         ex = self.cur.execute; ns = self.ns
         self.oid = oid = self.oidForSeqId(seqId)
+        self.revId = int(self.csWorking)
+
+        r = ex("select max(seqId) from %(ws_log)s where oid=? and seqId!=?"%ns, (oid,seqId))
+        newSeqId = r.fetchone()[0]
 
         r = ex("delete from %(ws_log)s where seqId=?"%ns, (seqId,))
-        print r.rowcount
         if r.rowcount == 0:
             return False
 
-        r = ex("select max(seqId) from %(ws_log)s where oid=?"%ns, (oid,)).fetchone()
-        if r is None: seqId = r
-        else: seqId = r[0]
-
-        self.updateVersions(oid, seqId, False)
+        if newSeqId < seqId:
+            # The revision for oid needs to be corrected
+            self.updateVersions(oid, newSeqId, False)
+        return newSeqId
 
