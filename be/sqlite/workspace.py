@@ -101,11 +101,11 @@ class Workspace(WorkspaceBase):
             if state in s:
                 break
     def fetchVersions(self, cs, state='mark'):
+        ex = self.cur.execute; ns = self.ns
         self.checkCommited()
 
-        cur = self.cur; ns = self.ns
         versions = self._iterLineageToState(cs, state)
-        r = cur.executemany("""\
+        r = ex("""\
             insert or ignore into %(ws_version)s
                 select * from %(qs_version)s
                     where versionId=?;""" % ns, versions)
@@ -113,26 +113,24 @@ class Workspace(WorkspaceBase):
 
     def markCheckout(self):
         self.checkCommited()
-        cond = 'versionId != revId'
-        q = ('insert or ignore into %(qs_version)s (versionId, revId, oid, flags) \n'
-             '  select versionId, revId, oid, max(flags, ?) \n'
-             '    from %(ws_version)s where ' + cond)
-        r = ex(q%ns, (self._flags.marked,))
-        if not r.rowcount:
-            return False
 
-        print r.rowcount
-        self.cs.markChangeset()
-        return True
+        cs = self.cs
+        if not cs.isChangesetClosed():
+            raise WorkspaceError("Can only mark a committed and closed changeset")
+
+        ex = self.cur.execute; ns = self.ns
+        q = ('insert or ignore into %(qs_version)s (versionId, revId, oid, flags) \n'
+             '  select ?, revId, oid, ? \n'
+             '    from %(ws_version)s where ')
+        q += 'versionId != ?'
+        r = ex(q%ns, (cs, self._flags.marked, cs))
+        count = r.rowcount
+        if count:
+            cs.markChangeset()
+        return count
 
     def clearWorkspace(self):
         self.checkCommited()
-
-        ex = self.cur.execute; ns = self.ns
-        n, = ex("select count(seqId) from %(ws_log)s;"%ns).fetchone()
-        if n:
-            raise WorkspaceError("Uncommited workspace log items")
-
         ex("delete from %(ws_version)s;"%ns)
 
     def publishChanges(self):
