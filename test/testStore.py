@@ -80,7 +80,7 @@ def main():
     if not root.data:
         print 'adding data:'
         root.data = myModule.myData
-    elif 1:
+    elif 0:
         root.data.extend(myModule.genList(10))
     elif 0:
         root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
@@ -93,24 +93,29 @@ def main():
         for x in xrange(200):
             e = random.choice(root.data)
             e.data.extend(myModule.genList(5))
-    elif 0:
-        n = 0
+    elif 1:
+        n = 0; nAdded = 0
         if len(root.data) < 50:
             root.data.extend(myModule.genList(5))
         population = random.sample(root.data, min(len(root.data), 50))
         random.shuffle(population)
         while population:
             e = population.pop()
+            count = 0
+
             if len(e.data)>4:
                 random.shuffle(e.data)
                 #e.data.append(myModule.genList(1, [myModule.A, myModule.B]))
             else:
-                e.data.extend(myModule.genList(5))
+                count = 5
+                e.data.extend(myModule.genList(count))
 
             try: bs.mark(e)
             except LookupError: pass
-            else: n += 1
-        print 'items shuffled:', n
+            else: 
+                if not count: n += 1
+                else: nAdded += count
+        print 'items shuffled:', n, 'added:', nAdded
     else: 
         mark = False
 
@@ -118,7 +123,7 @@ def main():
         print 'marking root modified'
         bs.mark(root)
 
-    bs.saveDirtyOnly = False
+    #bs.saveDirtyOnly = False
     with qsh:
         if 1:
             bs.saveAll()

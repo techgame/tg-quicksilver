@@ -58,7 +58,7 @@ class ChangesetAbstract(NotStorableMixin):
             return self
 
         items = self._selectEntryItems()
-        return self._setState(items)
+        return self._setChangesetAttrs(items)
 
     @classmethod
     def new(klass, host, versionId=None):
@@ -74,7 +74,6 @@ class ChangesetAbstract(NotStorableMixin):
     #~ Attributes
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    state = None
     branch = None
     ts = None
     mergeId = None
@@ -98,7 +97,33 @@ class ChangesetAbstract(NotStorableMixin):
         self._parentId = parentId
     parentId = property(getParentId, setParentId)
 
-    def _setState(self, items):
+    _state = None # a set of strings
+    def getState(self):
+        r = self._state
+        if r is None:
+            self._state = r = set()
+        return r
+    def setState(self, state):
+        if isinstance(state, basestring):
+            state = self._stateFromStr(state)
+        elif state is None:
+            state = set()
+        elif not isinstance(state, set):
+            raise ValueError("Expected state to be a set or a string")
+        self._state = state
+    state = property(getState, setState)
+
+    def _stateAsStr(self, state=None):
+        if state is None: 
+            state = self._state
+        if state:
+            return ','.join(state)
+    def _stateFromStr(self, state):
+        if not state:
+            return set()
+        return set(state.split(','))
+
+    def _setChangesetAttrs(self, items):
         for n,v in items:
             setattr(self, n, v)
 
@@ -161,8 +186,15 @@ class ChangesetAbstract(NotStorableMixin):
         items = utils.joinKWDict(items, kw)
         return self._updateEntryItems(items)
 
-    def updateState(self, state):
-        r = self._updateEntryItems(state=state)
+    def updateState(self, add, remove=None):
+        state = self.state
+        if remove:
+            if remove is True:
+                state.clear()
+            else: state.discard(remove)
+        if add: state.add(add)
+
+        r = self._updateEntryItems(state=self._stateAsStr(state))
         self.state = state
         return r
 
@@ -176,7 +208,7 @@ class ChangesetAbstract(NotStorableMixin):
 
         return self._updateEntryItems(mergeId=mergeId, mergeFlags=mergeFlags)
 
-    def createVersion(self, parentId, branch=None, state='new'):
+    def createVersion(self, parentId, branch=None, state='open'):
         if self.versionId is not None:
             raise ChangesetError("Already have a valid versionId")
         self._initialized = False
@@ -194,7 +226,10 @@ class ChangesetAbstract(NotStorableMixin):
         if items is None:
             return self.init(force=True)
 
-        return self._setState(items)
+        return self._setChangesetAttrs(items)
+
+    def markChangeset(self, state='mark'):
+        self.updateState('mark')
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Override obligations

@@ -16,10 +16,16 @@ from . import workspaceChangeOps as Ops
 #~ Workspace concept
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+class WorkspaceFlags(object):
+    clear = 0
+    marked = 1
+    changed = 4
+
 class Workspace(WorkspaceBase):
     Schema = workspaceSchema.WorkspaceSchema
     metadataView = metadata.metadataView
     temporary = False
+    _flags = WorkspaceFlags
 
     def __init__(self, host, wsid=None):
         self.setHost(host)
@@ -84,21 +90,40 @@ class Workspace(WorkspaceBase):
         self.tagRevIds()
         return r
 
+    def tagRevIds(self):
+        self.cur.execute("update %(ws_version)s set ws_versionId=versionId, ws_revId=revId;"%self.ns)
+
     def _iterLineageToState(self, cs, state='mark'):
         if cs is None: 
             cs = self.cs
         for v,s in cs.iterLineage():
             yield (v,)
-            if s == state:
+            if state in s:
                 break
-    def fetchVersions(self, cs):
+    def fetchVersions(self, cs, state='mark'):
+        self.checkCommited()
+
         cur = self.cur; ns = self.ns
-        versions = self._iterLineageToState(cs, 'mark')
+        versions = self._iterLineageToState(cs, state)
         r = cur.executemany("""\
             insert or ignore into %(ws_version)s
                 select * from %(qs_version)s
                     where versionId=?;""" % ns, versions)
         return r.rowcount
+
+    def markCheckout(self):
+        self.checkCommited()
+        cond = 'versionId != revId'
+        q = ('insert or ignore into %(qs_version)s (versionId, revId, oid, flags) \n'
+             '  select versionId, revId, oid, max(flags, ?) \n'
+             '    from %(ws_version)s where ' + cond)
+        r = ex(q%ns, (self._flags.marked,))
+        if not r.rowcount:
+            return False
+
+        print r.rowcount
+        self.cs.markChangeset()
+        return True
 
     def clearWorkspace(self):
         self.checkCommited()
@@ -110,31 +135,39 @@ class Workspace(WorkspaceBase):
 
         ex("delete from %(ws_version)s;"%ns)
 
-    def tagRevIds(self):
-        self.cur.execute("update %(ws_version)s set ws_versionId=versionId, ws_revId=revId;"%self.ns)
-    def clearLog(self):
+    def publishChanges(self):
         ex = self.cur.execute; ns = self.ns
-        ex("update %(ws_version)s set seqId=null,flags=0,ws_versionId=versionId,ws_revId=revId;" % ns)
-        ex("delete from %(ws_log)s;" % ns)
-        #self.tagRevIds()
+        nLog = self._publishChangeLog(ex, ns)
+        nPtrs = self._publishChangeVersions(ex, ns)
+        if nPtrs != nLog:
+            raise RuntimeError("Changes to revision log (%s) did not equal the changes to the version table(%s) " % (nLog, nPtrs))
+        return nLog
 
-    def _publishChanges(self):
-        ex = self.cur.execute; ns = self.ns
+    def _publishChangeLog(self, ex, ns):
         q = ('insert into %(qs_revlog)s (revId, oid, %(payloadCols)s) \n'
              '  select L.revId, L.oid, %(payloadCols)s from %(ws_log)s as L \n'
              '    inner join %(ws_version)s using (seqId)')
         r = ex(q%ns)
-        nLog = r.rowcount
+        return r.rowcount
 
+    def _publishChangeVersions(self, ex, ns):
         q = ('insert into %(qs_version)s (versionId, revId, oid, flags) \n'
-             '  select versionId, revId, oid, 1 as flags \n'
+             '  select versionId, revId, oid, ? \n'
              '    from %(ws_version)s where seqId notnull;')
-        r = ex(q%ns)
-        nPtrs = r.rowcount
-        if nPtrs != nLog:
-            raise RuntimeError("Changes to revision log (%s) did not equal the changes to the version table(%s) " % (nLog, nPtrs))
+        r = ex(q%ns, (self._flags.changed,))
+        return r.rowcount
 
-        self.clearLog()
+    def clearChangeLog(self):
+        ex = self.cur.execute; ns = self.ns
+        ex("update %(ws_version)s set seqId=null,flags=?;" % ns, 
+                (self._flags.clear,))
+        ex("delete from %(ws_log)s;" % ns)
+
+    def lastChangeLogId(self):
+        r = self.cur.execute("select max(seqId) from %(ws_log)s;" % self.ns)
+        r = r.fetchone()
+        if r is not None:
+            return r[0]
 
     def _dbCommit(self):
         self.conn.commit()
@@ -142,6 +175,22 @@ class Workspace(WorkspaceBase):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ OID data operations
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    grpId = None
+    def nextGroupId(self, grpId=False):
+        if grpId is False:
+            grpId = self.grpId
+        if grpId is None:
+            q = 'select max(grpId) from %s'%(self.ns.ws_log,)
+            r = self.conn.execute(q).fetchone()
+            grpId = (r[0] or -1) + 1
+
+        grpId += 1
+        self.grpId = grpId
+        return grpId
+
+    def newOid(self):
+        return self.ns.newOid()
 
     def contains(self, oid):
         q = "select oid from %(ws_version)s where oid=? limit 1;" % self.ns
@@ -168,42 +217,24 @@ class Workspace(WorkspaceBase):
         if r is not None:
             return self.asDataTuple(r)
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    grpId = None
-    def nextGroupId(self, grpId=False):
-        if grpId is False:
-            grpId = self.grpId
-        if grpId is None:
-            q = 'select max(grpId) from %s'%(self.ns.ws_log,)
-            r = self.conn.execute(q).fetchone()
-            grpId = (r[0] or -1) + 1
-
-        grpId += 1
-        self.grpId = grpId
-        return grpId
-
-    def newOid(self):
-        return self.ns.newOid()
-
     def write(self, oid, **data):
         if oid is None:
             oid = self.newOid()
         op = Ops.Write(self)
         return op.perform(oid, data)
 
-    def backout(self, seqId):
-        op = Ops.Backout(self)
-        return op.perform(seqId)
-    def postUpdate(self, seqId, **data):
-        op = Ops.PostUpdate(self)
-        return op.perform(seqId, data)
-
     def remove(self, oid):
         if oid is None:
             return False
         op = Ops.Remove(self)
         return op.perform(oid)
+
+    def postUpdate(self, seqId, **data):
+        op = Ops.PostUpdate(self)
+        return op.perform(seqId, data)
+    def postBackout(self, seqId):
+        op = Ops.Backout(self)
+        return op.perform(seqId)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

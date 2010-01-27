@@ -60,9 +60,16 @@ class WorkspaceBase(NotStorableMixin):
 
     def checkCommited(self, fail=True):
         csw = self.getCSWorking(False)
-        if csw is None: return True
-        if not fail: return False
-        raise WorkspaceError("Uncommited changeset")
+        if csw is None: 
+            if self.lastChangeLogId() is None:
+                return True
+            elif fail:
+                raise WorkspaceError("Uncommited workspace log items")
+            else: return False
+
+        if fail: 
+            raise WorkspaceError("Uncommited changeset")
+        return False
 
     def checkout(self, cs=False):
         self.checkCommited()
@@ -85,8 +92,9 @@ class WorkspaceBase(NotStorableMixin):
         ns = self.ns
 
         if kw: cs.update(kw)
-        self._publishChanges()
-        cs.updateState('closed')
+        self.publishChanges()
+        self.clearChangeLog()
+        cs.updateState('closed', remove='open')
         self.csWorking = None
         self.csCheckout = cs
         self._updateCurrentChangeset(cs)
@@ -103,21 +111,28 @@ class WorkspaceBase(NotStorableMixin):
         self._updateCurrentChangeset(self.cs)
 
     def _revertChanges(self):
-        self.clearLog()
+        self.clearChangeLog()
         self.clearWorkspace()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ template methods to effect workspace ~~~~~~~~~~~~~
 
-    def _publishChanges(self):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def _updateCurrentChangeset(self, cs):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def fetchVersions(self, cs):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def markCheckout(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
     def clearWorkspace(self):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def clearLog(self):
+    def publishChanges(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+    def clearChangeLog(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def lastChangeLogId(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+    def _updateCurrentChangeset(self, cs):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def _dbCommit(self):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
@@ -126,18 +141,22 @@ class WorkspaceBase(NotStorableMixin):
     #~ OID data operations
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def nextGroupId(self, grpId=False):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def newOid(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
     def contains(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def read(self, oid, asNS=True):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def readAll(self, asNS=True):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def newOid(self):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def write(self, oid, **data):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def remove(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def rollback(self, oid=None):
+
+    def postUpdate(self, seqId, **data):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def postBackout(self, seqId):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 

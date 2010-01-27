@@ -10,6 +10,9 @@ from .utils import OpBase
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Changeset(OpBase, ChangesetBase):
+    def markChangeset(self, mark='mark'):
+        self.updateState(mark)
+
     def _selectEntryItems(self, columns=None):
         """Returns a list of the form [(name, value)]"""
         if columns is not None:
