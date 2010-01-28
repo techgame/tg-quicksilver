@@ -3,15 +3,9 @@ Boundry Store:
 - Prevent storage of boundary store objects @done
 - Add support for writing only marked dirty objects @done
     - add operational flag to BoundaryStore indicating default save mode @done
-- Change get implementation to allow deferred proxy
-    - use a flag to mark deferred or not @done
-
+- Change get implementation to allow deferred proxy @done
+- Add deferred proxy
 - Add threaded hash delegation object to speed up serial storage
-    - add a deferred task class
-    - keep the seqId on the class for revertion
-    - be careful not to revert observed state if the item has been post-changed
-            select * where seqId=max(seqId), oid=?;
-        if no results, use oid, revId_ws to access previous version from qs_revlog
 
 - Boundary call signature
     Make a boundary call signature to get Oids for those objects that know
@@ -27,7 +21,7 @@ Boundry Store:
     
 
 SQLite Backend:
-- Add ability to write mark entry into manifest for changeset views
+- Add ability to write mark entry into manifest for changeset views @done
 
 AL Thoughts:
 - ALOS.view .app .user as boundary objects

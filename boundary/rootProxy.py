@@ -2,8 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import types
-import functools
+import types, functools, operator
 from ..mixins import NotStorableMixin
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -33,6 +32,7 @@ class ProxyMeta(type):
     _proxyIgnored = set(_proxyIgnored.split())
     _proxyKinds = (
             types.UnboundMethodType, 
+            type(operator.__contains__),
             type(object.__reduce__), 
             type(object.__delattr__),
             type(object.__new__),)
@@ -57,18 +57,20 @@ class ProxyMeta(type):
         nsKeys = []
         if ns:
             update_wrapper = functools.update_wrapper
-
+            rebind = klass._rebindFunction
             for name,vfn in ns.items():
-                def fn(self, *args, **kw):
-                    obj = object.__getattribute__(self, '_obj_')
-                    return getattr(obj, name)
-
-                ns[name] = update_wrapper(fn, vfn)
+                ns[name] = update_wrapper(rebind(name), vfn)
                 nsKeys.append(name)
 
         ns.update(_objKlass_=objKlass, __slots__=[], __module__=objKlass.__module__)
         name = '%s{%s}' % (objKlass.__name__, klass.__name__)
         return klass.__class__(name, (klass,), ns)
+
+    def _rebindFunction(klass, name):
+        def fn(self, *args, **kw):
+            obj = object.__getattribute__(self, '_obj_')
+            return getattr(obj, name)
+        return fn
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
