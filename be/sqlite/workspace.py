@@ -64,7 +64,8 @@ class Workspace(WorkspaceBase):
 
     def readCurrentChangeset(self):
         wsMeta = self.metadataView("workspaces")
-        cs = wsMeta.getAt(self.wsid, None)
+        wsid = self.wsid or True
+        cs = wsMeta.getAt(wsid, None)
         if cs is not None:
             return self._asChangeset(cs)
     def saveCurrentChangeset(self, cs=False, force=False):
@@ -74,9 +75,11 @@ class Workspace(WorkspaceBase):
             return False
 
         wsMeta = self.metadataView("workspaces")
+        wsid = self.wsid or True
         if cs is not None:
-            wsMeta[self.wsid] = long(cs)
-        else: del wsMeta[self.wsid]
+            wsMeta[wsid] = long(cs)
+        else: 
+            del wsMeta[wsid]
         return True
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
