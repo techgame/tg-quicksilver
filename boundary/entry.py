@@ -19,13 +19,14 @@ class BoundaryStrategy(IBoundaryStrategy):
     """This strategy asks objects for a _boundary_(bndCtx) method.  If it
     exists, it is called.  It can return a new reference object, an oid, or
     True to generate a new oid"""
+
     def __init__(self, store, bndCtx):
         self.store = store
         self._objCache = store._objCache
         self.bndCtx = bndCtx
 
-    def setBoundary(self, oid):
-        self._targetOid = oid
+    def setBoundaryRef(self, oid, obj=False):
+        self.targetOid = oid
 
     def objForRef(self, ref):
         if isinstance(ref, (int,long)):
@@ -41,7 +42,7 @@ class BoundaryStrategy(IBoundaryStrategy):
 
         oid = self._objCache.get(obj, None)
         if oid is not None:
-            if oid == self._targetOid:
+            if oid == self.targetOid:
                 oid = None
             return oid
         else:

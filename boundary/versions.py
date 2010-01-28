@@ -5,7 +5,7 @@
 from TG.quicksilver.be.sqlite import Versions
 
 from .store import BoundaryStore
-from .storeEx import StatsBoundaryStore
+from .storeEx import BoundaryStats
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -27,10 +27,10 @@ class BoundaryVersions(Versions):
         return self.boundaryStoreForWS(ws, **kw)
     boundaryWS = boundaryWorkspace
 
+    BoundaryStore = BoundaryStore
     def boundaryStoreForWS(self, ws, stats=False):
+        bs = self.BoundaryStore(ws)
         if stats:
-            bs = StatsBoundaryStore(ws)
-        else:
-            bs = BoundaryStore(ws)
+            BoundaryStats(bs)
         return bs
 

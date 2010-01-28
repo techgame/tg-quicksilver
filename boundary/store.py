@@ -74,6 +74,8 @@ class BoundaryStore(NotStorableMixin):
             entry.dirty = dirty
         return entry
 
+    def add(self, obj, deferred=False):
+        return self.set(None, obj, deferred)
     def set(self, oid, obj, deferred=False):
         if oid is None:
             oid = self.ws.newOid()
@@ -98,6 +100,15 @@ class BoundaryStore(NotStorableMixin):
             self._objCache.pop(entry.obj, None)
             self._objCache.pop(entry.pxy, None)
         self.ws.remove(oid)
+
+    def __getitem__(self, oid):
+        return self.get(oid)
+    def __setitem__(self, oid, obj):
+        return self.set(oid, obj)
+    def __detitem__(self, oid):
+        return self.delete(oid)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def saveAll(self):
         entryColl = self._iterNewEntries(self._cache.values())

@@ -10,7 +10,7 @@ from ...mixins import NotStorableMixin
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class IBoundaryStrategy(object):
-    def setBoundary(self, oid):
+    def setBoundaryRef(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def objForRef(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
@@ -24,7 +24,7 @@ class BaseAmbitCodec(NotStorableMixin):
         self.init(boundaryStrategy)
 
     def init(self, boundaryStrategy):
-        self._setBoundary = boundaryStrategy.setBoundary
+        self.setBoundaryRef = boundaryStrategy.setBoundaryRef
         self._initEncoder(boundaryStrategy.refForObj)
         self._initDecoder(boundaryStrategy.objForRef)
 

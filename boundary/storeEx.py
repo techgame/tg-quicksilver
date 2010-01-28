@@ -2,16 +2,9 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-from .store import BoundaryStore
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-class StatsBoundaryStore(BoundaryStore):
-    def init(self, workspace):
-        BoundaryStore.init(self, workspace)
-        BoundaryStats(self)
 
 class BoundaryStats(object):
     r_count = 0

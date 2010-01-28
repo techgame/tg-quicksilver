@@ -46,7 +46,7 @@ class PickleAmbitCodec(BaseAmbitCodec):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def dump(self, oid, obj):
-        self._setBoundary(oid)
+        self.setBoundaryRef(oid, obj)
         io, p, clear = self._encoding
         p.clear_memo()
         try:
@@ -60,7 +60,7 @@ class PickleAmbitCodec(BaseAmbitCodec):
         return data
 
     def load(self, oid, data):
-        self._setBoundary(oid)
+        self.setBoundaryRef(oid, False)
         io, up = self._decoding
         io.write(data)
         io.seek(0)
@@ -72,7 +72,7 @@ class PickleAmbitCodec(BaseAmbitCodec):
         return obj
 
     def hashDigest(self, oid, data):
-        self._setBoundary(oid)
+        self.setBoundaryRef(oid, False)
         h = self._hasher.hashs(data)
         return h.digest()
 
