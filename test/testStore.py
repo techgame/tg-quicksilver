@@ -38,6 +38,61 @@ def test(bs, aList):
 #~ Main 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+def changeData(bs, root):
+    mark = True
+    if 0:
+        root.data.extend(myModule.genList(10))
+    elif 0:
+        root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
+    elif 0:
+        for x in xrange(200):
+            root.data.extend(myModule.genList(5))
+    elif 0:
+        root.data.extend(myModule.genList(100))
+    elif 0:
+        for x in xrange(200):
+            e = random.choice(root.data)
+            e.data.extend(myModule.genList(5))
+    elif 1:
+        n = 0; nAdded = 0
+        if len(root.data) < 50:
+            root.data.extend(myModule.genList(5))
+        population = random.sample(root.data, min(len(root.data), 50))
+        random.shuffle(population)
+        while population:
+            e = population.pop()
+
+            if len(e.data)>4:
+                count = 0
+                random.shuffle(e.data)
+                #e.data.append(myModule.genList(1, [myModule.A, myModule.B]))
+            else:
+                count = 5
+                e.data.extend(myModule.genList(count))
+
+            try: bs.mark(e)
+            except LookupError, err: 
+                nAdded += count
+            else: 
+                if not count: n += 1
+                else: nAdded += count
+        print 'items shuffled:', n, 'added:', nAdded
+    else: 
+        mark = False
+
+    if mark:
+        print 'marking root modified'
+        bs.mark(root)
+
+
+def saveData(bs, qsh, saveDirtyOnly=None):
+    if saveDirtyOnly is not None:
+        bs.saveDirtyOnly = saveDirtyOnly
+
+    with qsh:
+        bs.saveAll()
+
+
 def main():
     qsh = Versions('db_quicksilver.qag', 'obj')
     ws = qsh.workspace()
@@ -49,9 +104,6 @@ def main():
     print ws.cs
     if ws.cs is None:
         ws.cs = qsh.head()
-    if ws.cs:
-        print ws.cs
-        #ws.checkout()
 
     root = bs.get(100, None)
     if root is None:
@@ -76,68 +128,20 @@ def main():
         print 'compressed:   %12i' % (len(raw.payload),)
         print
 
-    mark = True
     if not root.data:
         print 'adding data:'
         root.data = myModule.myData
-    elif 0:
-        root.data.extend(myModule.genList(10))
-    elif 0:
-        root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
-    elif 0:
-        for x in xrange(200):
-            root.data.extend(myModule.genList(5))
-    elif 0:
-        root.data.extend(myModule.genList(100))
-    elif 0:
-        for x in xrange(200):
-            e = random.choice(root.data)
-            e.data.extend(myModule.genList(5))
-    elif 1:
-        n = 0; nAdded = 0
-        if len(root.data) < 50:
-            root.data.extend(myModule.genList(5))
-        population = random.sample(root.data, min(len(root.data), 50))
-        random.shuffle(population)
-        while population:
-            e = population.pop()
-            count = 0
-
-            if len(e.data)>4:
-                random.shuffle(e.data)
-                #e.data.append(myModule.genList(1, [myModule.A, myModule.B]))
-            else:
-                count = 5
-                e.data.extend(myModule.genList(count))
-
-            try: bs.mark(e)
-            except LookupError: pass
-            else: 
-                if not count: n += 1
-                else: nAdded += count
-        print 'items shuffled:', n, 'added:', nAdded
-    else: 
-        mark = False
-
-    if mark:
-        print 'marking root modified'
         bs.mark(root)
 
-    #bs.saveDirtyOnly = False
-    with qsh:
-        if 1:
-            bs.saveAll()
-        else:
-            for entry, r in bs.iterSaveAll():
-                print 'save:', entry.oid, r
+    if 0:
+        changeData(bs, root)
+        saveData(bs, qsh, not False)
+        if 0: bs.commit()
 
-        if 0:
-            print "ws.backout(None):"
-            ws.backout(None)
-
-        if 1:
-            bs.commit()
-
+    changeData(bs, root)
+    saveData(bs, qsh, False)
+    if 1: bs.commit()
+    if 0: bs.ws.markCheckout()
 
     stats = getattr(bs, 'stats', None)
     if stats is not None:
