@@ -3,6 +3,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import collections
+import sqlite3
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Workspace concept
@@ -33,11 +34,6 @@ class WorkspaceSchema(object):
             self.createWorking(cur)
             self.createChangesetLog(cur)
 
-    def newDataTuple(self):
-        cols = list(self.ns.payload)
-        cols.insert(0, 'oid')
-        return collections.namedtuple('WSData', cols)
-
     def createWorking(self, cur):
         cur.execute("""\
             create %(temp)s table if not exists %(ws_version)s (
@@ -49,6 +45,7 @@ class WorkspaceSchema(object):
               seqId INTEGER,
 
               ws_versionId INTEGER, ws_revId INTEGER);""" % self.ns)
+        self.addColumnsTo(cur, 'ws_log', 'payload')
 
     def createChangesetLog(self, cur):
         '''Used ChangesetLog to implement undo/redo in a workspace'''
@@ -62,6 +59,17 @@ class WorkspaceSchema(object):
               grpId INTEGER,
 
               %(payloadDefs)s);""" % self.ns);
+
+    def addColumnsTo(self, cur, table, columnKey):
+        """Allows adding payload columns to a revlog or changeset tables"""
+        ns = self.ns
+        table = ns[table]
+        ex = cur.execute
+        for cName, cDef in ns[columnKey+'List']:
+            try:
+                ex("alter table %s add column %s %s;" % (table, cName, cDef))
+            except sqlite3.OperationalError:
+                pass
 
     def dropWorkspace(self, cur):
         ns = self.ns

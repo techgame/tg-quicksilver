@@ -47,9 +47,6 @@ class Workspace(WorkspaceBase):
         schema = self.Schema(self.ns, self)
         schema.initStore(self.conn)
 
-        self.DataTuple = schema.newDataTuple()
-        self.asDataTuple = self.DataTuple._make
-
     def _initStoredCS(self):
         cs = self.readCurrentChangeset()
         if cs is None:
@@ -191,35 +188,49 @@ class Workspace(WorkspaceBase):
         return self.ns.newOid()
 
     def contains(self, oid):
-        q = "select oid from %(ws_version)s where oid=? limit 1;" % self.ns
+        q = "select oid, revId, seqId from %(ws_version)s where oid=? limit 1;" % self.ns
         r = self.conn.execute(q, (oid,))
-        return r.fetchone() is not None
+        r = r.fetchone()
+        if r is not None: 
+            return tuple(r)
+        else: return False
 
-    def read(self, oid):
+    def read(self, oid, cols=False):
         ex = self.conn.execute; ns = self.ns
+        if not isinstance(oid, tuple):
+            r = self.contains(oid)
+        else: r = oid
+        if not r: return None
+        oid, revId, seqId = r
 
-        q = "select seqId, revId from %(ws_version)s where oid=?"
-        r = ex(q % ns, (oid,)).fetchone()
-        if r is None: return None
-        seqId, revId = r
+        if cols is False:
+            cols = ns.payloadCols
+        elif not isinstance(cols, basestring):
+            cols = ','.join(cols)
 
-        q = "select oid, %(payloadCols)s from \n  "
+        q = "select oid, %s from \n  "
         if seqId is not None:
-            q += "%(ws_log)s where seqId=? and oid=?"
-            r = ex(q % ns, (seqId,oid))
+            q += "%s where seqId=? and oid=?"
+            q %= (cols, ns.ws_log)
+            args = (seqId,oid)
         else:
-            q += "%(qs_revlog)s where oid=? and revId=?"
-            r = ex(q % ns, (oid,revId))
+            q += "%s where oid=? and revId=?" 
+            q %= (cols, ns.qs_revlog)
+            args = (oid,revId)
 
+        q += ' limit 1;'
+        r = ex(q, args)
         r = r.fetchone()
         if r is not None:
-            return self.asDataTuple(r)
+            return r
 
     def write(self, oid, **data):
+        return self.writeEx(oid, data.items())
+    def writeEx(self, oid, dataItems):
         if oid is None:
             oid = self.newOid()
         op = Ops.Write(self)
-        return op.perform(oid, data)
+        return op.perform(oid, dataItems)
 
     def remove(self, oid):
         if oid is None:

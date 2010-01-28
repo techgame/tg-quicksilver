@@ -12,7 +12,7 @@ from .utils import Namespace
 class VersionsAbstract(NotStorableMixin):
     ns = Namespace()
 
-    def workspace(self, *args, **kw):
+    def workspace(self, wsid=None):
         """Returns a bound Workspace"""
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 

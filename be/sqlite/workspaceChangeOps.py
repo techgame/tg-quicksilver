@@ -143,12 +143,13 @@ class ChangeLogOpBase(ChangeOpBase):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Write(ChangeOpBase):
-    def perform(self, oid, kwData):
+    def perform(self, oid, dataItems):
         if oid is None:
             raise ValueError("OID cannot be None")
         self.oid = oid
         self.revId = int(self.csWorking)
 
+        kwData = dict(dataItems)
         cols, data = splitColumnData(kwData, self.ns.payload)
         if kwData: 
             raise ValueError("Unknown keys: %s" % (data.keys(),))
