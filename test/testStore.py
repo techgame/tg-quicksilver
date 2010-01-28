@@ -116,7 +116,6 @@ def main():
     else:
         print 'found:', root
 
-    print
     if root.data:
         list(root.data)
         print 'data:', len(root.data)
@@ -139,7 +138,7 @@ def main():
         if 0: bs.commit()
 
     changeData(bs, root)
-    saveData(bs, qsh, False)
+    saveData(bs, qsh, not False)
     if 1: bs.commit()
     if 0: bs.ws.markCheckout()
 

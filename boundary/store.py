@@ -3,6 +3,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import os, sys
+import weakref
 from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
@@ -27,6 +28,7 @@ class BoundaryStrategy(IBoundaryStrategy):
     def refForObj(self, obj):
         if isinstance(obj, type): 
             return
+
         if getattr(obj, '__bounded__', False):
             oid = self._objCache.get(obj, None)
             if oid is None:
@@ -57,13 +59,28 @@ class BoundaryEntry(NotStorableMixin):
         if obj is not None:
             self.RootProxy.adaptProxy(self.pxy, obj)
 
+    def setDeferred(self):
+        self.RootProxy.adaptDeferred(self.pxy, self)
+
     def setHash(self, hash):
         self.hash = hash
         self.dirty = not hash
 
+    _wrStore = None
+    def fetchProxyFn(self, name, args):
+        r = self._wrStore().get(self.oid)
+        return getattr(self.obj, name)
+
+    @classmethod
+    def newFlyweight(klass, store, **kw):
+        kw.update(_wrStore=weakref.ref(store))
+        name = '%s_%s' % (klass.__name__, id(store))
+        return type(klass)(name, (klass,), kw)
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStore(NotStorableMixin):
+    BoundaryEntry = BoundaryEntry
     BoundaryStrategy = BoundaryStrategy
     AmbitCodec = PickleAmbitCodec
     saveDirtyOnly = True
@@ -73,6 +90,8 @@ class BoundaryStore(NotStorableMixin):
 
     def init(self, workspace):
         self.ws = workspace
+        self.BoundaryEntry = BoundaryEntry.newFlyweight(self)
+
         self._cache = {}
         self._objCache = {}
         self._newEntries = []
@@ -94,11 +113,9 @@ class BoundaryStore(NotStorableMixin):
         entry = self._cache.get(oid, self)
         if entry is not self:
             return entry.pxy
-        else: entry = BoundaryEntry(oid)
+        else: entry = self.BoundaryEntry(oid)
 
         if self._hasEntry(entry):
-            # TODO: remove readEntry when implemented
-            self._readEntry(entry)
             return entry.pxy
         else: return None
 
@@ -107,7 +124,7 @@ class BoundaryStore(NotStorableMixin):
         if entry is not self:
             if entry.obj is not None:
                 return entry.pxy
-        else: entry = BoundaryEntry(oid)
+        else: entry = self.BoundaryEntry(oid)
 
         if self._readEntry(entry):
             return entry.pxy
@@ -126,7 +143,7 @@ class BoundaryStore(NotStorableMixin):
         if oid is None:
             oid = self.ws.newOid()
 
-        entry = BoundaryEntry(oid)
+        entry = self.BoundaryEntry(oid)
         entry.setup(obj, None)
         self._cache[oid] = entry
         self._objCache[entry.pxy] = oid
@@ -183,6 +200,7 @@ class BoundaryStore(NotStorableMixin):
         if not self.ws.contains(entry.oid):
             return False
 
+        entry.setDeferred()
         oid = entry.oid
         self._cache[oid] = entry
         self._objCache[entry.pxy] = oid

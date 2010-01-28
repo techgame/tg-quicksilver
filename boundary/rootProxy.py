@@ -37,7 +37,7 @@ class ProxyMeta(type):
             type(object.__delattr__),
             type(object.__new__),)
 
-    def createProxyClass(klass, objKlass):
+    def rebindNamespace(klass, objKlass, rebind=None):
         ignored = klass._proxyIgnored
         ns = dict()
 
@@ -54,22 +54,54 @@ class ProxyMeta(type):
                 continue
             ns[name] = value
 
-        nsKeys = []
-        if ns:
-            update_wrapper = functools.update_wrapper
+        if not ns: 
+            return ns
+
+        update_wrapper = functools.update_wrapper
+        if rebind is None:
             rebind = klass._rebindFunction
-            for name,vfn in ns.items():
-                ns[name] = update_wrapper(rebind(name), vfn)
-                nsKeys.append(name)
+        elif rebind is True:
+            rebind = klass._rebindProxyFunction
+
+        for name,vfn in ns.items():
+            ns[name] = update_wrapper(rebind(name), vfn)
+        return ns
+
+    def createProxyClass(klass, objKlass, rebind=None):
+        ns = dict()
+        if rebind is True:
+            ns.update(klass.rebindNamespace(operator, rebind))
+            ns.update(klass.rebindNamespace(RootProxy, rebind))
+        else:
+            ns.update(klass.rebindNamespace(objKlass, rebind))
 
         ns.update(_objKlass_=objKlass, __slots__=[], __module__=objKlass.__module__)
         name = '%s{%s}' % (objKlass.__name__, klass.__name__)
-        return klass.__class__(name, (klass,), ns)
+        return type(klass)(name, (klass,), ns)
 
     def _rebindFunction(klass, name):
-        def fn(self, *args, **kw):
+        def fn(self, *args):
             obj = object.__getattribute__(self, '_obj_')
-            return getattr(obj, name)
+            fn = getattr(obj, name)
+            return fn(*args)
+        return fn
+
+    def _rebindProxyFunction(klass, fnName):
+        """Uses entry.fetchProxyFn to retrive object from store, passing fnName
+        that caused the proxy-load-fault"""
+        if fnName == '__getattribute__':
+            def fn(self, *args):
+                try: return object.__getattribute__(self, *args)
+                except AttributeError: pass
+
+                entry = object.__getattribute__(self, '_obj_')
+                fn = entry.fetchProxyFn(fnName, args)
+                return fn(*args)
+        else:
+            def fn(self, *args):
+                entry = object.__getattribute__(self, '_obj_')
+                obj = entry.fetchProxyFn(fnName, args)
+                return fn(*args)
         return fn
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -78,6 +110,11 @@ class RootProxy(object):
     __metaclass__ = ProxyMeta 
     __bounded__ = True
     __slots__ = ['_obj_', '__weakref__']
+
+    def __subclasscheck__(self, test):
+        return False
+    def __instancecheck__(self, test):
+        return False
 
     def __repr__(self):
         obj = object.__getattribute__(self, '_obj_')
@@ -96,8 +133,8 @@ class RootProxy(object):
 
     def __getstate__(self):
         return object.__getattribute__(self, '_obj_')
-    def __setstate__(self, obj):
-        object.__setattribute__(self, '_obj_', obj)
+    def __setstate__(self, state):
+        object.__setattribute__(self, '_obj_', state)
 
     _adaptCache = {}
     @classmethod
@@ -112,8 +149,20 @@ class RootProxy(object):
         object.__setattr__(pxy, '_obj_', obj)
         return pxy
 
-    def __subclasscheck__(self, test):
-        return False
-    def __instancecheck__(self, test):
-        return False
+    @classmethod
+    def adaptDeferred(klass, pxy, entry):
+        pxyKlass = klass._adaptCache[None]
+        object.__setattr__(pxy, '__class__', pxyKlass)
+        object.__setattr__(pxy, '_obj_', entry)
+        return pxy
+
+    @classmethod
+    def createDeferredProxy(klass):
+        objKlass = type(None)
+        pxyKlass = klass.createProxyClass(objKlass, True)
+        klass._adaptCache[None] = pxyKlass
+        klass._adaptCache[objKlass] = pxyKlass
+        return pxyKlass
+
+DeferredRootProxy = RootProxy.createDeferredProxy()
 
