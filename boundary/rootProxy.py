@@ -108,9 +108,10 @@ class ProxyMeta(type):
 
 class RootProxy(object):
     __metaclass__ = ProxyMeta 
-    __bounded__ = True
     __slots__ = ['_obj_', '__weakref__']
 
+    def _boundary_(self, bctx, oid):
+        return oid
     def __subclasscheck__(self, test):
         return False
     def __instancecheck__(self, test):

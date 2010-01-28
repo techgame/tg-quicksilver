@@ -4,12 +4,12 @@ Boundry Store:
 - Add support for writing only marked dirty objects @done
     - add operational flag to BoundaryStore indicating default save mode @done
 - Change get implementation to allow deferred proxy @done
-- Add deferred proxy
+- Add deferred proxy @done
 - Add threaded hash delegation object to speed up serial storage
 
 - Boundary call signature
-    Make a boundary call signature to get Oids for those objects that know
-    their OID.  These objects can be cached for faster storage.
+    - Make a boundary call signature @done
+    - Cache objects oid for faster storage. @done
     
     Also, each object that accepts the call can get a unique
     sub-oid for the master oid.  This allows for the difference finder to

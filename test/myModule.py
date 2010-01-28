@@ -26,10 +26,14 @@ class A(object):
         return 0
 
 class B(A): 
-    pass
+    def _boundary_(self, bctx, oid):
+        print 'oid:', oid
+        return False
 
 class C(B): 
-    __bounded__ = True
+    def _boundary_(self, bctx, oid):
+        print 'oid:', oid
+        return oid
 
 class Root(B):
     __bounded__ = True

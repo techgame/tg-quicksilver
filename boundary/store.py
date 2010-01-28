@@ -29,12 +29,19 @@ class BoundaryStrategy(IBoundaryStrategy):
         if isinstance(obj, type): 
             return
 
-        if getattr(obj, '__bounded__', False):
-            oid = self._objCache.get(obj, None)
-            if oid is None:
-                return self._store.set(None, obj, True)
-            elif oid != self._targetOid:
-                return oid
+        fnBoundary = getattr(obj, '_boundary_', False)
+        if not fnBoundary: 
+            return
+
+        oid = self._objCache.get(obj, None)
+        oid = fnBoundary(self, oid)
+        if oid is False: 
+            return
+
+        if oid is None:
+            return self._store.set(None, obj, True)
+        elif oid != self._targetOid:
+            return oid
 
 class BoundaryEntry(NotStorableMixin):
     __slots__ = ['oid', 'hash', 'obj', 'pxy', 'dirty']
