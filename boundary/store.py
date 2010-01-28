@@ -16,17 +16,29 @@ from .rootProxy import RootProxy
 class BoundaryEntry(NotStorableMixin):
     __slots__ = ['oid', 'hash', 'obj', 'pxy', 'dirty']
     RootProxy = RootProxy
+
     def __init__(self, oid):
         self.oid = oid
         self.pxy = self.RootProxy()
         self.setup(None, None)
 
-    def setup(self, obj, hash):
+    def __repr__(self):
+        return '[oid: %s]@ %r' % (self.oid, self.obj)
+
+    def setup(self, obj=False, hash=False):
+        if obj is not False:
+            self.setObject(obj)
+        if hash is not False:
+            self.setHash(hash)
+
+    def setObject(self, obj):
         self.obj = obj
-        self.hash = hash
-        self.dirty = not hash
         if obj is not None:
             self.RootProxy.adaptProxy(self.pxy, obj)
+
+    def setHash(self, hash):
+        self.hash = hash
+        self.dirty = not hash
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -169,7 +181,7 @@ class BoundaryStore(NotStorableMixin):
                 # zlib encoded
                 data = data.decode('zlib')
 
-            obj = ambit.load(oid, data, record)
+            obj = ambit.load(oid, data)
             hash = record.hash
             if hash: hash = bytes(hash)
             entry.setup(obj, hash)
@@ -192,33 +204,24 @@ class BoundaryStore(NotStorableMixin):
         if obj is None:
             return False, None
 
-        debugHashing = False #XXX
         with self.ambit() as ambit:
-            data, hash = ambit.dump(oid, obj)
+            data = ambit.dump(oid, obj)
+            # TODO: delegate expensive hashing
+            hash = ambit.hashDigest(oid, data)
+            changed = (entry.hash != hash)
 
-            if isinstance(hash, bytes) and not debugHashing: #XXX
-                changed = (entry.hash != hash)
-                hash = buffer(hash)
-                task = None
-            else:
-                changed = None
-                task = hash
-                hash = None
-
-            if changed or task is not None: #XXX
+            if changed:
                 payload = buffer(data.encode('zlib'))
+                hash = buffer(hash)
                 self._onWrite(payload, data, entry)
 
                 seqId = self.ws.write(oid, payload=payload, hash=hash)
-                if task is not None:
-                    hash = task
-                    if entry.hash == hash:
-                        print 'backout seqId:', (seqId, entry.hash, hash)
-                        self.ws.backout(seqId)
-                    else:
-                        print 'accept seqId:', (seqId, entry.hash, hash)
-                        self.ws.postUpdate(seqId, hash=buffer(hash))
-                        entry.setup(obj, hash)
+                entry.setHash(hash)
+
+                #if entry.hash != hash:
+                #    self.ws.postUpdate(seqId, hash=buffer(hash))
+                #    entry.setHash(hash)
+                #else: self.ws.postBackout(seqId)
 
         return changed, len(data)
 
@@ -276,4 +279,5 @@ class BoundaryStore(NotStorableMixin):
 
     def _onWriteError(self, entry, exc):
         sys.excepthook(*sys.exc_info())
+        print >> sys.stderr, 'entry %r' % (entry,)
 

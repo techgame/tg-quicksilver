@@ -24,7 +24,7 @@ class BaseAmbitCodec(NotStorableMixin):
     def dump(self, obj, hash=True):
         """Return serialized data from obj, and hash if hash is True"""
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def load(self, data, meta=None):
+    def load(self, data):
         """Return object unserialized from data"""
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
@@ -44,18 +44,21 @@ class BaseAmbitStrategy(NotStorableMixin):
             raise RuntimeError("TargetOID is not None: unexpected recursion")
 
         self._targetOid = oid
-        r = self._codec.dump(obj, True)
+        data = self._codec.dump(obj)
         self._targetOid = None
-        return r # data, hash
+        return data
 
-    def load(self, oid, data, meta=None):
+    def load(self, oid, data):
         if self._targetOid is not None:
             raise RuntimeError("TargetOID is not None: unexpected recursion")
 
         self._targetOid = oid
-        obj = self._codec.load(data, meta)
+        obj = self._codec.load(data)
         self._targetOid = None
         return obj
+
+    def hashDigest(self, oid, data):
+        return self._codec.hashDigest(data)
 
     def _objForRef(self, oid):
         return self.host.ref(oid)

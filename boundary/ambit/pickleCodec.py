@@ -45,7 +45,7 @@ class PickleAmbitCodec(BaseAmbitCodec):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def dump(self, obj, hash=True):
+    def dump(self, obj):
         io, p, clear = self._encoding
         p.clear_memo()
         try:
@@ -56,13 +56,9 @@ class PickleAmbitCodec(BaseAmbitCodec):
             io.truncate()
             if clear:
                 p.clear_memo()
+        return data
 
-        if hash:
-            hash = self.hashDigest(data)
-            return data, hash
-        else: return data
-
-    def load(self, data, meta=None):
+    def load(self, data):
         io, up = self._decoding
         io.write(data)
         io.seek(0)
