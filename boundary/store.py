@@ -18,6 +18,8 @@ class BoundaryStore(NotStorableMixin):
     AmbitCodec = entry.BoundaryAmbitCodec
     saveDirtyOnly = True
 
+    context = None
+
     def __init__(self, workspace):
         self.init(workspace)
 
@@ -36,7 +38,7 @@ class BoundaryStore(NotStorableMixin):
         if ambitList:
             ambit = ambitList.pop()
         else: 
-            boundary = self.BoundaryStrategy(self)
+            boundary = self.BoundaryStrategy(self, self.context)
             ambit = self.AmbitCodec(boundary)
 
         yield ambit

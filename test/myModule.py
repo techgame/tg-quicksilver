@@ -26,12 +26,12 @@ class A(object):
         return 0
 
 class B(A): 
-    def _boundary_(self, bctx, oid):
+    def _boundary_(self, bndCtx):
         return False
 
 class C(B): 
-    def _boundary_(self, bctx, oid):
-        return oid
+    def _boundary_(self, bndCtx):
+        return True
 
 class Root(B):
     __bounded__ = True
