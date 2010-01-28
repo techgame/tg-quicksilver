@@ -27,12 +27,10 @@ class A(object):
 
 class B(A): 
     def _boundary_(self, bctx, oid):
-        print 'oid:', oid
         return False
 
 class C(B): 
     def _boundary_(self, bctx, oid):
-        print 'oid:', oid
         return oid
 
 class Root(B):

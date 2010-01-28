@@ -14,21 +14,23 @@ class ProxyMeta(type):
 
     def __instancecheck__(klass, instance):
         """Override for isinstance(instance, klass)."""
+        print 'meta __instancecheck__:'
         r = type.__instancecheck__(klass, instance)
         if not r:
             r = isinstance(klass._objKlass_, instance)
         return r
     def __subclasscheck__(klass, subclass):
         """Override for issubclass(subclass, klass)."""
+        print 'meta __subclasscheck__:'
         r = type.__subclasscheck__(klass, subclass)
         if r: return r
         r = issubclass(subclass, klass._objKlass_)
         return r
 
     _proxyIgnored = '''
-        __metadata__ __class__ __subclasscheck__ __instancecheck__
-        __weakref__ __subclasshook__ __dict__ __repr__
-        '''
+        __metaclass__ __class__ __dict__ __weakref__ 
+        __subclasscheck__ __instancecheck__ __subclasshook__ 
+        __getattribute__ __repr__ '''
     _proxyIgnored = set(_proxyIgnored.split())
     _proxyKinds = (
             types.UnboundMethodType, 
@@ -76,7 +78,9 @@ class ProxyMeta(type):
             ns.update(klass.rebindNamespace(objKlass, rebind))
 
         ns.update(_objKlass_=objKlass, __slots__=[], __module__=objKlass.__module__)
-        name = '%s{%s}' % (objKlass.__name__, klass.__name__)
+        name = klass.__name__
+        if not isinstance(None, objKlass):
+            name = '%s{%s}' % (objKlass.__name__, name)
         return type(klass)(name, (klass,), ns)
 
     def _rebindFunction(klass, name):
@@ -89,19 +93,10 @@ class ProxyMeta(type):
     def _rebindProxyFunction(klass, fnName):
         """Uses entry.fetchProxyFn to retrive object from store, passing fnName
         that caused the proxy-load-fault"""
-        if fnName == '__getattribute__':
-            def fn(self, *args):
-                try: return object.__getattribute__(self, *args)
-                except AttributeError: pass
-
-                entry = object.__getattribute__(self, '_obj_')
-                fn = entry.fetchProxyFn(fnName, args)
-                return fn(*args)
-        else:
-            def fn(self, *args):
-                entry = object.__getattribute__(self, '_obj_')
-                obj = entry.fetchProxyFn(fnName, args)
-                return fn(*args)
+        def fn(self, *args):
+            entry = object.__getattribute__(self, '_obj_')
+            obj = entry.fetchProxyFn(fnName, args)
+            return fn(*args)
         return fn
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -110,18 +105,9 @@ class RootProxy(object):
     __metaclass__ = ProxyMeta 
     __slots__ = ['_obj_', '__weakref__']
 
-    def _boundary_(self, bctx, oid):
-        return oid
-    def __subclasscheck__(self, test):
-        return False
-    def __instancecheck__(self, test):
-        return False
-
     def __repr__(self):
         obj = object.__getattribute__(self, '_obj_')
-        if obj is None:
-            return repr(obj)
-        return object.__repr__(self)
+        return repr(obj)
     def __getattribute__(self, name):
         obj = object.__getattribute__(self, '_obj_')
         return getattr(obj, name)
@@ -157,6 +143,20 @@ class RootProxy(object):
         object.__setattr__(pxy, '_obj_', entry)
         return pxy
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class RootProxyRef(RootProxy):
+    __slots__ = []
+    def __repr__(self):
+        entry = object.__getattribute__(self, '_obj_')
+        typeref = entry.typeref()
+        return '<%s.%s {proxy oid:%s}>' % (
+            typeref.__module__, typeref.__name__, entry.oid, )
+
+    def __getattribute__(self, name):
+        entry = object.__getattribute__(self, '_obj_')
+        return entry.fetchProxyAttr(name)
+
     @classmethod
     def createDeferredProxy(klass):
         objKlass = type(None)
@@ -165,5 +165,5 @@ class RootProxy(object):
         klass._adaptCache[objKlass] = pxyKlass
         return pxyKlass
 
-DeferredRootProxy = RootProxy.createDeferredProxy()
+RootProxyRef = RootProxyRef.createDeferredProxy()
 

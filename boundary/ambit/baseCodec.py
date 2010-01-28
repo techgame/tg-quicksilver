@@ -2,6 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import sys
 from ...mixins import NotStorableMixin
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -40,4 +41,21 @@ class BaseAmbitCodec(NotStorableMixin):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def hashDigest(self, oid, data):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ typeref to support better deferred proxies ~~~~~~~
+
+    def encodeTyperef(self, klass):
+        return u'%s:%s' % (klass.__module__, klass.__name__)
+    def decodeTyperef(self, typeref):
+        if typeref:
+            module, name = typeref.split(':')
+            return self.find_class(module, name)
+    def find_class(self, module, name):
+        # Subclasses may override this
+        __import__(module)
+        mod = sys.modules[module]
+        klass = getattr(mod, name)
+        return klass
 

@@ -6,44 +6,23 @@ import timeit
 import random
 import myModule
 
-from TG.quicksilver.be.sqlite import Versions
-from TG.quicksilver.boundary import BoundaryStore, StatsBoundaryStore
+from TG.quicksilver.boundary import BoundaryVersions
 random.seed()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-out = None
-def test(bs, aList):
-    global out
-    oid = bs.set(None, aList)
-    print 'stored at:', oid
-    print 'aList:', len(aList)
-    print 'out:', len(out)
-    bm = len(out)
-    for e in ['zlib', 'bz2']:
-        sc = len(out.encode(e))
-        print '  %s: %s B,  %.2f%% compressed' % (e, sc, 100*float(sc)/bm)
-        t = timeit.Timer('out.encode(%r)'%(e,), 'from __main__ import out')
-        t = t.timeit(10)/10.
-        print '    @ %6.3f s, %.4f MBps' % (t, len(out)/(t*(1<<20)))
-
-    print
-
-    rezList = bs.decode(out)
-    assert aList == rezList
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~ Main 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 def changeData(bs, root):
     mark = True
+    kl = [myModule.A, myModule.B, myModule.B, myModule.C]
     if 0:
         root.data.extend(myModule.genList(10))
     elif 0:
-        root.data.extend(myModule.genList(5, [myModule.C, myModule.C, myModule.C, myModule.A]))
+        root.data.extend(myModule.genList(5, kl))
+    elif 0:
+        for x in xrange(3165/5):
+            root.data.extend(myModule.genList(5, kl))
     elif 0:
         for x in xrange(200):
             root.data.extend(myModule.genList(5))
@@ -52,8 +31,12 @@ def changeData(bs, root):
     elif 0:
         for x in xrange(200):
             e = random.choice(root.data)
-            e.data.extend(myModule.genList(5))
-    elif 1:
+            if not isinstance(e, myModule.C):
+                continue
+            for x in xrange(10):
+                e.data.extend(myModule.genList(5, kl))
+                bs.mark(e)
+    elif 0:
         n = 0; nAdded = 0
         if len(root.data) < 50:
             root.data.extend(myModule.genList(5))
@@ -94,16 +77,13 @@ def saveData(bs, qsh, saveDirtyOnly=None):
 
 
 def main():
-    qsh = Versions('db_quicksilver.qag', 'obj')
-    ws = qsh.workspace()
-    if 0:
-        bs = BoundaryStore(ws)
-    else:
-        bs = StatsBoundaryStore(ws)
+    qsh = BoundaryVersions('db_quicksilver.qag', 'obj')
+    bs = qsh.boundaryWorkspace(stats=True)
 
-    print ws.cs
-    if ws.cs is None:
-        ws.cs = qsh.head()
+    print 'bs.ws.cs:', bs.ws.cs
+    if bs.ws.cs is None:
+        bs.ws.cs = qsh.head()
+        print bs.ws.cs
 
     root = bs.get(100, None)
     if root is None:
@@ -114,19 +94,16 @@ def main():
         bs.commit()
         print 'created:', root
     else:
-        print 'found:', root
-
-    if root.data:
-        list(root.data)
-        print 'data:', len(root.data)
+        print 'found:', root, len(root.data)
 
     raw = bs.raw(root)
     if raw is not None:
-        print 'uncompressed: %12i' % (len(raw.payload),)
+        print 'uncompressed: %12i' % (len(raw['payload']),)
         raw = bs.raw(root, False)
-        print 'compressed:   %12i' % (len(raw.payload),)
+        print 'compressed:   %12i' % (len(raw['payload']),)
         print
 
+    print root.data
     if not root.data:
         print 'adding data:'
         root.data = myModule.myData
@@ -145,7 +122,6 @@ def main():
     stats = getattr(bs, 'stats', None)
     if stats is not None:
         stats.printStats()
-    #test(bs, myModule.myData)
 
 if __name__=='__main__':
     main()

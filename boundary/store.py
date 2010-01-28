@@ -8,7 +8,7 @@ from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
 from .ambit import IBoundaryStrategy, PickleAmbitCodec
-from .rootProxy import RootProxy
+from .rootProxy import RootProxy, RootProxyRef
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -44,7 +44,6 @@ class BoundaryStrategy(IBoundaryStrategy):
             return oid
 
 class BoundaryEntry(NotStorableMixin):
-    __slots__ = ['oid', 'hash', 'obj', 'pxy', 'dirty']
     RootProxy = RootProxy
 
     def __init__(self, oid):
@@ -54,6 +53,9 @@ class BoundaryEntry(NotStorableMixin):
 
     def __repr__(self):
         return '[oid: %s]@ %r' % (self.oid, self.obj)
+
+    def _boundary_(self, bctx, oid):
+        return oid
 
     def setup(self, obj=False, hash=False):
         if obj is not False:
@@ -66,16 +68,37 @@ class BoundaryEntry(NotStorableMixin):
         if obj is not None:
             self.RootProxy.adaptProxy(self.pxy, obj)
 
-    def setDeferred(self):
+    def setDeferred(self, typeref):
+        self._typeref = typeref
         self.RootProxy.adaptDeferred(self.pxy, self)
+
+    def typeref(self):
+        obj = self.obj
+        if obj is None:
+            return self._typeref
+        else: return obj.__class__
 
     def setHash(self, hash):
         self.hash = hash
         self.dirty = not hash
 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     _wrStore = None
+    def fetchObject(self):
+        return self._wrStore().get(self.oid)
+
     def fetchProxyFn(self, name, args):
-        r = self._wrStore().get(self.oid)
+        obj = self.fetchObject()
+        return getattr(self.obj, name)
+
+    _fetchRemapAttr = {'__class__':'_typeref', '_boundary_':'_boundary_'}
+    def fetchProxyAttr(self, name, _remap_=_fetchRemapAttr):
+        rn = _remap_.get(name)
+        if rn is not None:
+            return getattr(self, rn)
+
+        obj = self.fetchObject()
         return getattr(self.obj, name)
 
     @classmethod
@@ -184,17 +207,15 @@ class BoundaryStore(NotStorableMixin):
 
     def raw(self, oidOrObj, decode=True):
         oid = self._objCache.get(oidOrObj, oidOrObj)
-        record = self.ws.read(oid)
-        if decode and record:
-            data = bytes(record.payload)
-            if data.startswith('\x78\x9c'):
-                # zlib encoded
-                data = data.decode('zlib')
-            self._onRead(record, data, None)
-            record = record._replace(payload=buffer(data))
+        rec = self.ws.read(oid)
+        if decode and rec:
+            data = self._decodeData(rec['payload'])
+            self._onRead(rec, data, None)
+            rec = dict(rec)
+            rec['payload'] = buffer(data)
         else:
-            self._onRead(record, None, None)
-        return record
+            self._onRead(rec, None, None)
+        return rec
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Read and write entry workhorses
@@ -204,10 +225,15 @@ class BoundaryStore(NotStorableMixin):
         return self.ws.nextGroupId()
 
     def _hasEntry(self, entry):
-        if not self.ws.contains(entry.oid):
+        ref = self.ws.contains(entry.oid)
+        if not ref:
             return False
 
-        entry.setDeferred()
+        with self.ambit() as ambit:
+            rec = self.ws.read(ref, 'typeref')
+            typeref = ambit.decodeTyperef(rec['typeref'])
+            entry.setDeferred(typeref)
+
         oid = entry.oid
         self._cache[oid] = entry
         self._objCache[entry.pxy] = oid
@@ -216,25 +242,22 @@ class BoundaryStore(NotStorableMixin):
     def _readEntry(self, entry):
         oid = entry.oid
         with self.ambit() as ambit:
-            record = self.ws.read(oid)
-            if record is None:
+            rec = self.ws.read(oid)
+            if rec is None:
                 return False
-            if record.payload is None:
+            data = rec['payload']
+            if data is None:
                 return False
 
             self._cache[oid] = entry
             self._objCache[entry.pxy] = oid
 
-            data = bytes(record.payload)
-            if data.startswith('\x78\x9c'):
-                # zlib encoded
-                data = data.decode('zlib')
-
+            data = self._decodeData(data)
             obj = ambit.load(oid, data)
-            hash = record.hash
+            hash = rec['hash']
             if hash: hash = bytes(hash)
             entry.setup(obj, hash)
-            self._onRead(record, data, entry)
+            self._onRead(rec, data, entry)
 
         self._objCache[entry.obj] = oid
         return True
@@ -260,11 +283,13 @@ class BoundaryStore(NotStorableMixin):
             changed = (entry.hash != hash)
 
             if changed:
-                payload = buffer(data.encode('zlib'))
+                payload = self._encodeData(data)
                 hash = buffer(hash)
                 self._onWrite(payload, data, entry)
 
-                seqId = self.ws.write(oid, payload=payload, hash=hash)
+                typeref = ambit.encodeTyperef(entry.typeref())
+                seqId = self.ws.write(oid, 
+                    hash=hash, typeref=typeref, payload=payload)
                 entry.setHash(hash)
 
                 #if entry.hash != hash:
@@ -273,6 +298,15 @@ class BoundaryStore(NotStorableMixin):
                 #else: self.ws.postBackout(seqId)
 
         return changed, len(data)
+
+    def _encodeData(self, data):
+        return buffer(data.encode('zlib'))
+    def _decodeData(self, payload):
+        data = bytes(payload)
+        if data.startswith('\x78\x9c'):
+            # zlib encoded
+            data = data.decode('zlib')
+        return data
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Collection writing
@@ -323,7 +357,7 @@ class BoundaryStore(NotStorableMixin):
 
     def _onWrite(self, payload, data, entry): 
         pass
-    def _onRead(self, record, data, entry): 
+    def _onRead(self, rec, data, entry): 
         pass
 
     def _onWriteError(self, entry, exc):
