@@ -126,11 +126,11 @@ class BoundaryStore(NotStorableMixin):
         rec = self.ws.read(oid)
         if decode and rec:
             data = self._decodeData(rec['payload'])
-            self._onRead(rec, data, None)
+            self._onReadRaw(rec, data)
             rec = dict(rec)
             rec['payload'] = buffer(data)
         else:
-            self._onRead(rec, None, None)
+            self._onReadRaw(rec, None)
         return rec
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -274,6 +274,8 @@ class BoundaryStore(NotStorableMixin):
     def _onWrite(self, payload, data, entry): 
         pass
     def _onRead(self, rec, data, entry): 
+        pass
+    def _onReadRaw(self, rec, data):
         pass
 
     def _onWriteError(self, entry, exc):
