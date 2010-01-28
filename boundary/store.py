@@ -6,12 +6,33 @@ import os, sys
 from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
-from .ambit import AmbitStrategy
+from .ambit import IBoundaryStrategy, PickleAmbitCodec
 from .rootProxy import RootProxy
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class BoundaryStrategy(IBoundaryStrategy):
+    def __init__(self, store):
+        self._store = store
+        self._objCache = store._objCache
+
+    def setBoundary(self, oid):
+        self._targetOid = oid
+
+    def objForRef(self, oid):
+        return self._store.ref(oid)
+
+    def refForObj(self, obj):
+        if isinstance(obj, type): 
+            return
+        if getattr(obj, '__bounded__', False):
+            oid = self._objCache.get(obj, None)
+            if oid is None:
+                return self._store.set(None, obj, True)
+            elif oid != self._targetOid:
+                return oid
 
 class BoundaryEntry(NotStorableMixin):
     __slots__ = ['oid', 'hash', 'obj', 'pxy', 'dirty']
@@ -43,7 +64,8 @@ class BoundaryEntry(NotStorableMixin):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStore(NotStorableMixin):
-    AmbitStrategy = AmbitStrategy
+    BoundaryStrategy = BoundaryStrategy
+    AmbitCodec = PickleAmbitCodec
     saveDirtyOnly = True
 
     def __init__(self, workspace):
@@ -60,11 +82,13 @@ class BoundaryStore(NotStorableMixin):
     def ambit(self):
         ambitList = self._ambitList
         if ambitList:
-            a = ambitList.pop()
-        else: a = self.AmbitStrategy(self)
+            ambit = ambitList.pop()
+        else: 
+            boundary = self.BoundaryStrategy(self)
+            ambit = self.AmbitCodec(boundary)
 
-        yield a
-        ambitList.append(a)
+        yield ambit
+        ambitList.append(ambit)
 
     def ref(self, oid):
         entry = self._cache.get(oid, self)
