@@ -5,7 +5,7 @@
 from TG.quicksilver.be.sqlite import Versions
 
 from .store import BoundaryStore
-from .storeEx import BoundaryStats
+from .extensions import BoundaryStats
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 

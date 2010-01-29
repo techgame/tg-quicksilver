@@ -17,7 +17,10 @@ class BoundaryStats(object):
 
     def __init__(self, bs, attr='stats'):
         setattr(bs, attr, self)
+        self._onReadPost = bs._onRead
         bs._onRead = self._onRead
+
+        self._onWritePost = bs._onWrite
         bs._onWrite = self._onWrite
 
     def printStats(self):
@@ -31,14 +34,15 @@ class BoundaryStats(object):
                 self.w_data, self.w_payload)
 
     def _onRead(self, rec, data, entry):
-        if data is None:
-            return
-        self.r_count += 1
-        self.r_payload += len(rec['payload'])
-        self.r_data += len(data)
+        if data is not None:
+            self.r_count += 1
+            self.r_payload += len(rec['payload'])
+            self.r_data += len(data)
+        return self._onReadPost(rec, data, entry)
 
     def _onWrite(self, payload, data, entry):
         self.w_count += 1
         self.w_payload += len(payload)
         self.w_data += len(data)
+        return self._onWritePost(payload, data, entry)
 
