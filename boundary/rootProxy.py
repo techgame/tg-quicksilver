@@ -14,8 +14,8 @@ WRAPPER_UPDATES = ('__dict__',)
 def updateWrapperEx(wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES):
     # used from functools and modified to work with things that don't have certian attrs
     for attr in assigned:
-        v = getattr(wrapped, attr, None)
-        if v is not None:
+        v = getattr(wrapped, attr, False)
+        if v is not False:
             setattr(wrapper, attr, v)
     for attr in updated:
         getattr(wrapper, attr).update(getattr(wrapped, attr, {}))
@@ -23,21 +23,6 @@ def updateWrapperEx(wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAP
 
 class ProxyMeta(type):
     _objKlass_ = object
-
-    def __instancecheck__(klass, instance):
-        """Override for isinstance(instance, klass)."""
-        print 'meta __instancecheck__:'
-        r = type.__instancecheck__(klass, instance)
-        if not r:
-            r = isinstance(klass._objKlass_, instance)
-        return r
-    def __subclasscheck__(klass, subclass):
-        """Override for issubclass(subclass, klass)."""
-        print 'meta __subclasscheck__:'
-        r = type.__subclasscheck__(klass, subclass)
-        if r: return r
-        r = issubclass(subclass, klass._objKlass_)
-        return r
 
     _proxyIgnored = '''
         __metaclass__ __class__ __dict__ __weakref__ 
@@ -94,20 +79,38 @@ class ProxyMeta(type):
             name = '%s{%s}' % (objKlass.__name__, name)
         return type(klass)(name, (klass,), ns)
 
-    def _rebindFunction(klass, name):
-        def fn(self, *args):
-            obj = object.__getattribute__(self, '_obj_')
-            fn = getattr(obj, name)
-            return fn(*args)
+    def _rebindFunction(klass, fnName):
+        if fnName == '__call__':
+            def fn(self, *args, **kw):
+                obj = object.__getattribute__(self, '_obj_')
+                fn = getattr(obj, fnName)
+                return fn(*args, **kw)
+        else:
+            def fn(self, *args):
+                obj = object.__getattribute__(self, '_obj_')
+                fn = getattr(obj, fnName)
+                return fn(*args)
+        fn.__name__ = fnName
         return fn
 
     def _rebindProxyFunction(klass, fnName):
         """Uses entry.fetchProxyFn to retrive object from store, passing fnName
         that caused the proxy-load-fault"""
-        def fn(self, *args):
-            entry = object.__getattribute__(self, '_obj_')
-            obj = entry.fetchProxyFn(fnName, args)
-            return fn(*args)
+        if fnName == '__call__':
+            def fn(self, *args, **kw):
+                entry = object.__getattribute__(self, '_obj_')
+                fn = entry.fetchProxyFn(fnName, None)
+                if fn is None: 
+                    return NotImplemented
+                return fn(*args, **kw)
+        else:
+            def fn(self, *args):
+                entry = object.__getattribute__(self, '_obj_')
+                fn = entry.fetchProxyFn(fnName, args)
+                if fn is None: 
+                    return NotImplemented
+                return fn(*args)
+        fn.__name__ = fnName
         return fn
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -128,6 +131,10 @@ class RootProxy(object):
     def __delattr__(self, name, value):
         obj = object.__getattribute__(self, '_obj_')
         delattr(obj, name)
+
+    def __call__(self, *args, **kw):
+        obj = object.__getattribute__(self, '_obj_')
+        return obj(*args, **kw)
 
     def __getstate__(self):
         return object.__getattribute__(self, '_obj_')
@@ -158,6 +165,7 @@ class RootProxy(object):
 
 class RootProxyRef(RootProxy):
     __slots__ = []
+
     def __repr__(self):
         entry = object.__getattribute__(self, '_obj_')
         typeref = entry.typeref()

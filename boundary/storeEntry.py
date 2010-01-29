@@ -65,11 +65,14 @@ class BoundaryEntry(NotStorableMixin):
 
     _wrStore = None
     def fetchObject(self):
-        return self._wrStore().get(self.oid)
+        obj = self.obj
+        if obj is None:
+            obj = self._wrStore().get(self.oid)
+        return obj
 
     def fetchProxyFn(self, name, args):
         obj = self.fetchObject()
-        return getattr(self.obj, name)
+        return getattr(self.obj, name, None)
 
     _fetchRemapAttr = {'__class__':'_typeref', '_boundary_':'proxyBoundary'}
     def fetchProxyAttr(self, name, _remap_=_fetchRemapAttr):
