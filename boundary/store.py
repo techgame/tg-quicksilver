@@ -6,18 +6,19 @@ import sys
 from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
-from . import entry
+from . import storeEntry, storeRegistry
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStore(NotStorableMixin):
-    BoundaryEntry = entry.BoundaryEntry
-    BoundaryStrategy = entry.BoundaryStrategy
-    AmbitCodec = entry.BoundaryAmbitCodec
-    saveDirtyOnly = True
+    BoundaryStoreRegistry   = storeRegistry.BoundaryStoreRegistry
+    BoundaryEntry           = storeEntry.BoundaryEntry
+    BoundaryStrategy        = storeEntry.BoundaryStrategy
+    AmbitCodec              = storeEntry.BoundaryAmbitCodec
 
+    saveDirtyOnly = True
     context = None
 
     def __init__(self, workspace):
@@ -27,8 +28,7 @@ class BoundaryStore(NotStorableMixin):
         self.ws = workspace
         self.BoundaryEntry = self.BoundaryEntry.newFlyweight(self)
 
-        self._cache = {}
-        self._objCache = {}
+        self.reg = self.BoundaryStoreRegistry()
         self._newEntries = []
         self._ambitList = []
 
@@ -45,21 +45,22 @@ class BoundaryStore(NotStorableMixin):
         ambitList.append(ambit)
 
     def ref(self, oid):
-        entry = self._cache.get(oid, self)
-        if entry is not self:
+        entry = self.reg.lookup(oid)
+        if entry is not None:
             return entry.pxy
-        else: entry = self.BoundaryEntry(oid)
 
+        entry = self.BoundaryEntry(oid)
         if self._hasEntry(entry):
             return entry.pxy
         else: return None
 
     def get(self, oid, default=NotImplemented):
-        entry = self._cache.get(oid, self)
-        if entry is not self:
-            if entry.obj is not None:
-                return entry.pxy
-        else: entry = self.BoundaryEntry(oid)
+        entry = self.reg.lookup(oid, None)
+        if entry is None:
+            entry = self.BoundaryEntry(oid)
+        elif entry.obj is not None:
+            # otherwise we need to load the proxy
+            return entry.pxy
 
         if self._readEntry(entry):
             return entry.pxy
@@ -68,8 +69,7 @@ class BoundaryStore(NotStorableMixin):
         return default
 
     def mark(self, oidOrObj, dirty=True):
-        oid = self._objCache.get(oidOrObj, oidOrObj)
-        entry = self._cache[oid]
+        entry = self.reg.lookup(oidOrObj)
         if dirty is not None:
             entry.dirty = dirty
         return entry
@@ -82,9 +82,7 @@ class BoundaryStore(NotStorableMixin):
 
         entry = self.BoundaryEntry(oid)
         entry.setup(obj, None)
-        self._cache[oid] = entry
-        self._objCache[entry.pxy] = oid
-        self._objCache[entry.obj] = oid
+        self.reg.add(entry)
 
         if deferred:
             self._newEntries.append(entry)
@@ -95,10 +93,7 @@ class BoundaryStore(NotStorableMixin):
         return oid
 
     def delete(self, oid):
-        entry = self._cache.pop(oid, None)
-        if entry is not None:
-            self._objCache.pop(entry.obj, None)
-            self._objCache.pop(entry.pxy, None)
+        self.reg.remove(oid)
         self.ws.remove(oid)
 
     def __getitem__(self, oid):
@@ -111,18 +106,22 @@ class BoundaryStore(NotStorableMixin):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def saveAll(self):
-        entryColl = self._iterNewEntries(self._cache.values())
+        entryColl = self._iterNewEntries(self.reg.allOids())
         return self._writeEntryCollection(entryColl)
 
     def iterSaveAll(self):
-        entryColl = self._iterNewEntries(self._cache.values())
+        entryColl = self._iterNewEntries(self.reg.allOids())
         return self._iterWriteEntryCollection(entryColl)
 
     def commit(self, **kw):
         return self.ws.commit(**kw)
 
     def raw(self, oidOrObj, decode=True):
-        oid = self._objCache.get(oidOrObj, oidOrObj)
+        entry = self.reg.lookup(oidOrObj)
+        if entry is None: 
+            oid = long(oidOrObj)
+        else: oid = entry.oid
+
         rec = self.ws.read(oid)
         if decode and rec:
             data = self._decodeData(rec['payload'])
@@ -150,9 +149,7 @@ class BoundaryStore(NotStorableMixin):
             typeref = ambit.decodeTyperef(rec['typeref'])
             entry.setDeferred(typeref)
 
-        oid = entry.oid
-        self._cache[oid] = entry
-        self._objCache[entry.pxy] = oid
+        self.reg.add(entry)
         return True
 
     def _readEntry(self, entry):
@@ -165,8 +162,7 @@ class BoundaryStore(NotStorableMixin):
             if data is None:
                 return False
 
-            self._cache[oid] = entry
-            self._objCache[entry.pxy] = oid
+            self.reg.add(entry)
 
             data = self._decodeData(data)
             obj = ambit.load(oid, data)
@@ -175,7 +171,7 @@ class BoundaryStore(NotStorableMixin):
             entry.setup(obj, hash)
             self._onRead(rec, data, entry)
 
-        self._objCache[entry.obj] = oid
+        self.reg.add(entry)
         return True
 
     def _checkWriteEntry(self, entry):

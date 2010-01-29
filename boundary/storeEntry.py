@@ -22,7 +22,7 @@ class BoundaryStrategy(IBoundaryStrategy):
 
     def __init__(self, store, bndCtx):
         self.store = store
-        self._objCache = store._objCache
+        self._oidForObj = store.reg.oidForObj
         self.bndCtx = bndCtx
 
     def setBoundaryRef(self, oid, obj=False):
@@ -40,7 +40,7 @@ class BoundaryStrategy(IBoundaryStrategy):
         if not fnBoundary: 
             return # sentinal not found, cannot be reference
 
-        oid = self._objCache.get(obj, None)
+        oid = self._oidForObj(obj)
         if oid is not None:
             if oid == self.targetOid:
                 oid = None
