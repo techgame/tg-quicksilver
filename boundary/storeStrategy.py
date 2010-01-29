@@ -11,6 +11,12 @@ from .reference import BoundaryReferenceRegistry
 
 BoundaryAmbitCodec = PickleAmbitCodec
 
+_fastOutTypes_ = (
+    type(None), type, 
+    str, unicode, 
+    bool, int, long, float, complex,
+    tuple, list, set, dict, )
+
 class BasicBoundaryStrategy(IBoundaryStrategy):
     """This strategy asks objects for a _boundary_(bndCtx) method.  If it
     exists, it is called.  It can return a new reference object, an oid, or
@@ -31,8 +37,10 @@ class BasicBoundaryStrategy(IBoundaryStrategy):
         # use BoundaryReference.boundaryRef protocol
         return ref.boundaryRef(self)
 
-    def refForObj(self, obj):
+    def refForObj(self, obj, _fastOutTypes_=_fastOutTypes_):
         # this is one long method to keep it fast
+        if obj.__class__ in _fastOutTypes_:
+            return
         if isinstance(obj, type): 
             return # We don't accept type based sentinals
         fnBoundary = getattr(obj, '_boundary_', False)
@@ -56,8 +64,10 @@ class BasicBoundaryStrategy(IBoundaryStrategy):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
-    def refForObj(self, obj):
+    def refForObj(self, obj, _fastOutTypes_=_fastOutTypes_):
         # this is one long method to keep it fast
+        if obj.__class__ in _fastOutTypes_:
+            return
         if isinstance(obj, type): 
             return # We don't accept type based sentinals
 
@@ -85,8 +95,10 @@ class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStrategyByType(BoundaryStrategy):
-    def refForObj(self, obj):
+    def refForObj(self, obj, _fastOutTypes_=_fastOutTypes_):
         # this is one long method to keep it fast
+        if obj.__class__ in _fastOutTypes_:
+            return
         if isinstance(obj, type): 
             return # We don't accept type based sentinals
 
