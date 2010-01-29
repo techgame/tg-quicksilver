@@ -3,9 +3,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import hashlib
-from pprint import pprint
 from cPickle import Pickler, Unpickler
-#from pickle import Pickler, Unpickler
 from cStringIO import StringIO
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -76,16 +74,15 @@ class CanonicalForm(object):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class CanonicalObject(object):
-    __slots__ = ['n', 'cvec']
+    __slots__ = ['n', 'cv']
     counter = 100
     canonical = CanonicalForm()
 
     def __new__(klass, *args):
         self = object.__new__(CanonicalObject)
+        self.cv = cv = {0: klass.kind}
         if args:
-            self.cvec = [klass.kind, args]
-        else:
-            self.cvec = [klass.kind]
+            cv[1] = args
 
         n = CanonicalObject.counter + 1
         CanonicalObject.counter = n
@@ -97,21 +94,31 @@ class CanonicalObject(object):
             return cmp(self.n, other.n)
         return cmp(self.n, other)
     def __getstate__(self):
-        return self.cvec
+        return self.cv
     def __setstate__(self, state):
-        cvec = self.cvec
-        cvec.append(state)
-        self.cvec = self.canonical(cvec)
+        cv = self.cv
+        cv[2] = state
+        cv = cv.items()
+        cv.sort()
+        cv = [e[1] for e in cv]
+
+        self.cv = self.canonical(cv)
 
     def append(self, v):
-        print 'append!:', v
-        assert False
-    def extend(self, v):
-        print 'extend!:', v
-        assert False
+        l = self.cv.get(3)
+        if l is None:
+            self.cv[3] = l = []
+        l.append(v)
+    def extend(self, vl):
+        l = self.cv.get(3)
+        if l is None:
+            self.cv[3] = l = []
+        l.extend(vl)
     def __setitem__(self, k, v):
-        print 'setitem!:', (k, v)
-        assert False
+        d = self.cv.get(4)
+        if d is None:
+            self.cv[4] = d = {}
+        d[k] = v
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -132,6 +139,7 @@ class PickleHash(object):
     def _dump(self, obj):
         out = StringIO()
         p = Pickler(out, -1)
+        p.persistent_id = self._persistent_id
         p.dump(obj)
         return out.getvalue()
 
@@ -154,4 +162,8 @@ class PickleHash(object):
 
     def _persistent_load(self, ref):
         return ('ref', ref)
+
+    def _persistent_id(self, obj):
+        if isinstance(obj, type):
+            return '%s:%s' % (obj.__module__, obj.__name__)
 

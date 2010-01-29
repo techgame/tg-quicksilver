@@ -3,7 +3,6 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 from cPickle import Pickler, Unpickler
-#from pickle import Pickler, Unpickler
 from cStringIO import StringIO
 
 from .pickleHash import PickleHash
