@@ -2,12 +2,24 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import types, functools, operator
+import types, operator
 from ..mixins import NotStorableMixin
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+WRAPPER_ASSIGNMENTS = ('__module__', '__name__', '__doc__')
+WRAPPER_UPDATES = ('__dict__',)
+def updateWrapperEx(wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES):
+    # used from functools and modified to work with things that don't have certian attrs
+    for attr in assigned:
+        v = getattr(wrapped, attr, None)
+        if v is not None:
+            setattr(wrapper, attr, v)
+    for attr in updated:
+        getattr(wrapper, attr).update(getattr(wrapped, attr, {}))
+    return wrapper
 
 class ProxyMeta(type):
     _objKlass_ = object
@@ -59,14 +71,13 @@ class ProxyMeta(type):
         if not ns: 
             return ns
 
-        update_wrapper = functools.update_wrapper
         if rebind is None:
             rebind = klass._rebindFunction
         elif rebind is True:
             rebind = klass._rebindProxyFunction
 
         for name,vfn in ns.items():
-            ns[name] = update_wrapper(rebind(name), vfn)
+            ns[name] = updateWrapperEx(rebind(name), vfn)
         return ns
 
     def createProxyClass(klass, objKlass, rebind=None):
