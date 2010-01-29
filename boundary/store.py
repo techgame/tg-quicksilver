@@ -29,7 +29,7 @@ class BoundaryStore(NotStorableMixin):
         self.BoundaryEntry = self.BoundaryEntry.newFlyweight(self)
 
         self.reg = self.BoundaryStoreRegistry()
-        self._newEntries = []
+        self._deferredEntries = []
         self._ambitList = []
 
     @contextmanager
@@ -85,12 +85,25 @@ class BoundaryStore(NotStorableMixin):
         self.reg.add(entry)
 
         if deferred:
-            self._newEntries.append(entry)
+            self._deferredEntries.append(entry)
             return oid
 
         self._writeEntry(entry)
         self._writeEntryCollection(self._iterNewEntries())
         return oid
+
+    def write(self, oid, deferred=False):
+        entry = self.reg.lookup(oid)
+        if entry is None:
+            return None
+
+        if deferred:
+            self._deferredEntries.append(entry)
+            return entry
+
+        self._writeEntry(entry)
+        self._writeEntryCollection(self._iterNewEntries())
+        return entry
 
     def delete(self, oid):
         self.reg.remove(oid)
@@ -260,9 +273,9 @@ class BoundaryStore(NotStorableMixin):
             entries = self._popNewEntries()
 
     def _popNewEntries(self):
-        entries = self._newEntries
+        entries = self._deferredEntries
         if entries:
-            self._newEntries = []
+            self._deferredEntries = []
             return entries
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
