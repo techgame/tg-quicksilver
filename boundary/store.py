@@ -6,7 +6,7 @@ import sys
 from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
-from . import storeEntry, storeRegistry
+from . import storeEntry, storeRegistry, storeStrategy
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -15,8 +15,8 @@ from . import storeEntry, storeRegistry
 class BoundaryStore(NotStorableMixin):
     BoundaryStoreRegistry   = storeRegistry.BoundaryStoreRegistry
     BoundaryEntry           = storeEntry.BoundaryEntry
-    BoundaryStrategy        = storeEntry.BoundaryStrategy
-    AmbitCodec              = storeEntry.BoundaryAmbitCodec
+    BoundaryStrategy        = storeStrategy.BoundaryStrategy
+    AmbitCodec              = storeStrategy.BoundaryAmbitCodec
 
     saveDirtyOnly = True
     context = None
