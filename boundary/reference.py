@@ -57,7 +57,7 @@ class IBoundaryReference(object):
     types = []
     def __init__(self, strategy, refObj):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def boundaryRef(self, strategy):
+    def boundaryRef(self, strategy, bndCtx):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,7 +66,7 @@ class BoundaryWeakref(object):
     types = [weakref.ref]
     def __init__(self, strategy, refObj):
         self.wr_obj = refObj()
-    def boundaryRef(self, strategy):
+    def boundaryRef(self, strategy, bndCtx):
         return weakref.ref(self.wr_obj)
 
 registerCustomRef(BoundaryWeakref)

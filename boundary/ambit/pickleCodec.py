@@ -45,33 +45,33 @@ class PickleAmbitCodec(BaseAmbitCodec):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def dump(self, oid, obj):
-        self.setBoundaryRef(oid, obj)
-        io, p, clear = self._encoding
-        p.clear_memo()
-        try:
-            p.dump(obj)
-            data = io.getvalue()
-        finally:
-            io.seek(0)
-            io.truncate()
-            if clear:
-                p.clear_memo()
-        return data
+        with self.inBoundaryCtx(oid, obj):
+            io, p, clear = self._encoding
+            p.clear_memo()
+            try:
+                p.dump(obj)
+                data = io.getvalue()
+            finally:
+                io.seek(0)
+                io.truncate()
+                if clear:
+                    p.clear_memo()
+            return data
 
     def load(self, oid, data):
-        self.setBoundaryRef(oid, False)
-        io, up = self._decoding
-        io.write(data)
-        io.seek(0)
-        try:
-            obj = up.load()
-        finally:
+        with self.inBoundaryCtx(oid):
+            io, up = self._decoding
+            io.write(data)
             io.seek(0)
-            io.truncate()
-        return obj
+            try:
+                obj = up.load()
+            finally:
+                io.seek(0)
+                io.truncate()
+            return obj
 
     def hashDigest(self, oid, data):
-        self.setBoundaryRef(oid, False)
-        h = self._hasher.hashs(data)
-        return h.digest()
+        with self.inBoundaryCtx(oid):
+            h = self._hasher.hashs(data)
+            return h.digest()
 

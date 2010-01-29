@@ -2,6 +2,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import contextlib
 from .ambit import IBoundaryStrategy, PickleAmbitCodec
 from .reference import BoundaryReferenceRegistry
 
@@ -22,20 +23,23 @@ class BasicBoundaryStrategy(IBoundaryStrategy):
     exists, it is called.  It can return a new reference object, an oid, or
     True to generate a new oid"""
 
-    def __init__(self, store, bndCtx):
+    def __init__(self, store, context):
         self.store = store
         self.oidForObj = store.reg.oidForObj
-        self.bndCtx = bndCtx
+        self.context = context
 
-    def setBoundaryRef(self, oid, obj=False):
+    @contextlib.contextmanager
+    def inBoundaryCtx(self, oid=None, obj=False):
         self.targetOid = oid
+        self.bndCtx = self.context
+        yield None
 
     def objForRef(self, ref):
         if isinstance(ref, (int,long)):
             return self.store.ref(ref)
 
         # use BoundaryReference.boundaryRef protocol
-        return ref.boundaryRef(self)
+        return ref.boundaryRef(self, self.bndCtx)
 
     def refForObj(self, obj, _fastOutTypes_=_fastOutTypes_):
         # this is one long method to keep it fast
