@@ -41,19 +41,12 @@ class BoundaryStore(NotStorableMixin):
         self._deferredEntries = []
         self._ambitList = []
 
-    @contextmanager
-    def ambit(self):
-        ambitList = self._ambitList
-        if ambitList:
-            ambit = ambitList.pop()
-        else: 
-            boundary = self.BoundaryStrategy(self, self.context)
-            ambit = self.BoundaryAmbitCodec(boundary)
-
-        yield ambit
-        ambitList.append(ambit)
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Read Access: ref, get, raw
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def ref(self, oid):
+        """Returns a deferred proxied to the object stored at oid"""
         entry = self.reg.lookup(oid)
         if entry is not None:
             return entry.pxy
@@ -64,6 +57,7 @@ class BoundaryStore(NotStorableMixin):
         else: return None
 
     def get(self, oid, default=NotImplemented):
+        """Returns a transparent proxied to object stored at oid"""
         entry = self.reg.lookup(oid, None)
         if entry is None:
             entry = self.BoundaryEntry(oid)
@@ -76,6 +70,33 @@ class BoundaryStore(NotStorableMixin):
         elif default is NotImplemented:
             raise LookupError("No object found for oid: %r" % (oid,), oid)
         return default
+
+    def raw(self, oidOrObj, decode=True):
+        """Returns the raw database record for the oidOrObj"""
+        entry = self.reg.lookup(oidOrObj)
+        if entry is None: 
+            oid = long(oidOrObj)
+        else: oid = entry.oid
+
+        rec = self.ws.read(oid)
+        if decode and rec:
+            data = self._decodeData(rec['payload'])
+            self._onReadRaw(rec, data)
+            rec = dict(rec)
+            rec['payload'] = buffer(data)
+        else:
+            self._onReadRaw(rec, None)
+        return rec
+
+    def findRefsFrom(self, oidOrObj):
+        """Returns a set of oids referenced by oidOrObj"""
+        data = self.raw(oidOrObj, True)
+        refs = self.BoundaryRefWalker().findRefs(data)
+        return refs
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Write Access: mark, add, set, delete
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def mark(self, oidOrObj, dirty=True):
         entry = self.reg.lookup(oidOrObj)
@@ -118,6 +139,10 @@ class BoundaryStore(NotStorableMixin):
         self.reg.remove(oid)
         self.ws.remove(oid)
 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Dictionary-like key access by oid
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     def __getitem__(self, oid):
         return self.get(oid)
     def __setitem__(self, oid, obj):
@@ -126,45 +151,40 @@ class BoundaryStore(NotStorableMixin):
         return self.delete(oid)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Workspace methods: commit, saveAll
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def allOids(self):
+        """Returns all stored oids"""
+        return self.ws.allOids()
+
+    def allLoadedOids(self):
+        """Returns all currently loaded oids"""
+        return self.reg.allLoadedOids()
+
+    def nextGroupId(self):
+        """Increments groupId to mark sets of changes to support in-changeset rollback"""
+        return self.ws.nextGroupId()
 
     def saveAll(self):
-        entryColl = self._iterNewEntries(self.reg.allOids())
+        """Saves all entries loaded.  
+        See also: saveDirtyOnly to controls behavior"""
+        entryColl = self._iterNewEntries(self.reg.allLoadedOids())
         return self._writeEntryCollection(entryColl)
 
     def iterSaveAll(self):
-        entryColl = self._iterNewEntries(self.reg.allOids())
+        """Saves all entries loaded.  
+        See also: saveDirtyOnly to controls behavior"""
+        entryColl = self._iterNewEntries(self.reg.allLoadedOids())
         return self._iterWriteEntryCollection(entryColl)
 
     def commit(self, **kw):
+        """Commits changeset to quicksilver backend store"""
         return self.ws.commit(**kw)
 
-    def raw(self, oidOrObj, decode=True):
-        entry = self.reg.lookup(oidOrObj)
-        if entry is None: 
-            oid = long(oidOrObj)
-        else: oid = entry.oid
-
-        rec = self.ws.read(oid)
-        if decode and rec:
-            data = self._decodeData(rec['payload'])
-            self._onReadRaw(rec, data)
-            rec = dict(rec)
-            rec['payload'] = buffer(data)
-        else:
-            self._onReadRaw(rec, None)
-        return rec
-
-    def findRefsFrom(self, oid):
-        data = self.raw(oid, True)
-        refs = self.BoundaryRefWalker().findRefs(data)
-        return refs
-
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    #~ Read and write entry workhorses
+    #~ Utility: Entry read and write workhorses
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def nextGroupId(self):
-        return self.ws.nextGroupId()
 
     def _hasEntry(self, entry):
         ref = self.ws.contains(entry.oid)
@@ -230,12 +250,17 @@ class BoundaryStore(NotStorableMixin):
                     hash=buffer(hash), typeref=typeref, payload=payload)
                 entry.setHash(hash)
 
-                #if entry.hash != hash:
-                #    self.ws.postUpdate(seqId, hash=buffer(hash))
-                #    entry.setHash(hash)
-                #else: self.ws.postBackout(seqId)
+                # TODO: process delegated hashing
+                ##if entry.hash != hash:
+                ##    self.ws.postUpdate(seqId, hash=buffer(hash))
+                ##    entry.setHash(hash)
+                ##else: self.ws.postBackout(seqId)
 
         return changed, len(data)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Payload encoding/decoding
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def _encodeData(self, data):
         return buffer(data.encode('zlib'))
@@ -290,6 +315,23 @@ class BoundaryStore(NotStorableMixin):
         if entries:
             self._deferredEntries = []
             return entries
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Utility: ambit access, events
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @contextmanager
+    def ambit(self):
+        """Returns an ambit for the boundary store instance"""
+        ambitList = self._ambitList
+        if ambitList:
+            ambit = ambitList.pop()
+        else: 
+            boundary = self.BoundaryStrategy(self, self.context)
+            ambit = self.BoundaryAmbitCodec(boundary)
+
+        yield ambit
+        ambitList.append(ambit)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

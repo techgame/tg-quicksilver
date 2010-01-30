@@ -19,7 +19,7 @@ class BoundaryStoreRegistry(object):
         self.db_oid = {}
         self.db_ident = {}
 
-    def allOids(self):
+    def allLoadedOids(self):
         return self.db_oid.values()
 
     def add(self, entry):

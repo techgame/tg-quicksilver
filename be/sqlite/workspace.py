@@ -198,6 +198,10 @@ class Workspace(WorkspaceBase):
     def newOid(self):
         return self.ns.newOid()
 
+    def allOids(self):
+        res = self.conn.execute("select oid from %(ws_version)s;" % self.ns)
+        return [e[0] for e in res]
+
     def contains(self, oid):
         q = "select oid, revId, seqId from %(ws_version)s where oid=? limit 1;" % self.ns
         r = self.conn.execute(q, (oid,))

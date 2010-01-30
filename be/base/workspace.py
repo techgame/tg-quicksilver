@@ -155,6 +155,8 @@ class WorkspaceBase(NotStorableMixin):
     def newOid(self):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
+    def allOids(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def contains(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def read(self, oid, asNS=True):
