@@ -209,12 +209,11 @@ class BoundaryStore(NotStorableMixin):
 
             if changed:
                 payload = self._encodeData(data)
-                hash = buffer(hash)
                 self._onWrite(payload, data, entry)
 
                 typeref = ambit.encodeTyperef(entry.typeref())
                 seqId = self.ws.write(oid, 
-                    hash=hash, typeref=typeref, payload=payload)
+                    hash=buffer(hash), typeref=typeref, payload=payload)
                 entry.setHash(hash)
 
                 #if entry.hash != hash:
