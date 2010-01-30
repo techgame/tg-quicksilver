@@ -24,7 +24,8 @@ class BoundaryStore(NotStorableMixin):
     BoundaryStoreRegistry   = storeRegistry.BoundaryStoreRegistry
     BoundaryEntry           = storeEntry.BoundaryEntry
     BoundaryStrategy        = storeStrategy.BoundaryStrategy
-    AmbitCodec              = storeStrategy.BoundaryAmbitCodec
+    BoundaryAmbitCodec      = storeStrategy.BoundaryAmbitCodec
+    BoundaryRefWalker       = storeStrategy.BoundaryRefWalker
 
     saveDirtyOnly = True
     context = None
@@ -47,7 +48,7 @@ class BoundaryStore(NotStorableMixin):
             ambit = ambitList.pop()
         else: 
             boundary = self.BoundaryStrategy(self, self.context)
-            ambit = self.AmbitCodec(boundary)
+            ambit = self.BoundaryAmbitCodec(boundary)
 
         yield ambit
         ambitList.append(ambit)
@@ -152,6 +153,11 @@ class BoundaryStore(NotStorableMixin):
         else:
             self._onReadRaw(rec, None)
         return rec
+
+    def findRefsFrom(self, oid):
+        data = self.raw(oid, True)
+        refs = self.BoundaryRefWalker().findRefs(data)
+        return refs
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Read and write entry workhorses

@@ -11,14 +11,15 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import contextlib
-from .ambit import IBoundaryStrategy, PickleAmbitCodec
+from . import ambit
 from .reference import BoundaryReferenceRegistry
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-BoundaryAmbitCodec = PickleAmbitCodec
+BoundaryAmbitCodec = ambit.PickleAmbitCodec
+BoundaryRefWalker = ambit.PickleRefWalker
 
 _fastOutTypes_ = (
     type(None), type, 
@@ -26,7 +27,7 @@ _fastOutTypes_ = (
     bool, int, long, float, complex,
     tuple, list, set, dict, )
 
-class BasicBoundaryStrategy(IBoundaryStrategy):
+class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
     """This strategy asks objects for a _boundary_(bndCtx) method.  If it
     exists, it is called.  It can return a new reference object, an oid, or
     True to generate a new oid"""

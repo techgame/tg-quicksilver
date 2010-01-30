@@ -2,7 +2,7 @@ Boundry Store:
 - Add threaded hash delegation object to speed up serial storage
 
 Pickle Tools:
-- Reference walker, allowing us to do garbage collection over a workspace
+- Reference walker, allowing us to do garbage collection over a workspace @done
 - Dot visualizers
     - for individual stores
     - for boundary references as a whole
