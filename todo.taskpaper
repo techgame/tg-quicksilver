@@ -1,39 +1,10 @@
 Boundry Store:
-- Add ambit cache @done
-- Prevent storage of boundary store objects @done
-- Add support for writing only marked dirty objects @done
-    - add operational flag to BoundaryStore indicating default save mode @done
-- Change get implementation to allow deferred proxy @done
-- Add deferred proxy @done
 - Add threaded hash delegation object to speed up serial storage
 
-- Boundary call signature
-    - Make a boundary call signature @done
-    - Cache objects oid for faster storage. @done
-    
-    Also, each object that accepts the call can get a unique
-    sub-oid for the master oid.  This allows for the difference finder to
-    identify the sub-boundary object unambigiously.  
-    
-    The suboid counter would probably have to be kept on the revlog, but this
-    seems to be the same incremental oid numbering problem encountered in the
-    database?  Do we use the same counter, or a parallel one?
-    
-
-SQLite Backend:
-- Add ability to write mark entry into manifest for changeset views @done
-
-AL Thoughts:
-- ALOS.view .app .user as boundary objects
-    - Other canidates: ALOS.viewset
-
-- Transform resources to be object based instead
-
 Pickle Tools:
-- Canonical object graph hasher @done
 - Reference walker, allowing us to do garbage collection over a workspace
 - Dot visualizers
     - for individual stores
     - for boundary references as a whole
 - Pickle to JSON translator (and back)
-- Difference finder -- given that two pickles didn't match, what didn't match about them
+
