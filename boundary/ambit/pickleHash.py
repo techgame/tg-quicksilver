@@ -122,6 +122,17 @@ class CanonicalObject(object):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+class FullCanonicalForm(CanonicalForm):
+    sanMap = CanonicalForm.sanMap.copy()
+
+    @register(CanonicalObject, sanMap)
+    def _sanitizeObject(v, q, p):
+        s = v.__getstate__()
+        q.append(s)
+        return s
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 class PickleHash(object):
     hasher = hashlib.md5
     def __init__(self):
@@ -129,6 +140,13 @@ class PickleHash(object):
 
     def hashs(self, aPickleString):
         return self.hash(StringIO(aPickleString))
+
+    def debug(self, aPickleString):
+        obj = self._load(StringIO(aPickleString))
+        raw = self._dump(obj)
+        z = self.hasher(raw)
+        r = FullCanonicalForm()(obj)
+        return r, raw, z
 
     def hash(self, fh):
         z = self._dump(self._load(fh))
