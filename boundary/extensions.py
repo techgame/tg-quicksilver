@@ -23,7 +23,7 @@ class BoundaryStats(object):
         self._onWritePost = bs._onWrite
         bs._onWrite = self._onWrite
 
-    def printStats(self):
+    def printStats(self, reset=True):
         print 'Store Stats:'
         print '  @read [%5d] %8.1f%% = %6i/%6i' % (self.r_count,
                 ((100.0 * self.r_data)/max(1, self.r_payload)),
@@ -32,6 +32,12 @@ class BoundaryStats(object):
         print '  @write[%5d] %8.1f%% = %6i/%6i' % (self.w_count,
                 ((100.0 * self.w_data)/max(1,self.w_payload)),
                 self.w_data, self.w_payload)
+
+        if reset:
+            self.reset()
+
+    def reset(self):
+        self.__dict__.update((k,0) for k in self.__dict__ if k[:2] in ('r_', 'w_'))
 
     def _onRead(self, rec, data, entry):
         if data is not None:
