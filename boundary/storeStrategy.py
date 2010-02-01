@@ -64,6 +64,8 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
         oid = self.oidForObj(obj)
         if oid is not None:
             if oid == self.targetOid:
+                # call boundary on the target for continuity
+                fnBoundary(self.bndCtx)
                 oid = None
             return oid
         else:
