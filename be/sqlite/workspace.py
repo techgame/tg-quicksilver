@@ -48,8 +48,12 @@ class Workspace(WorkspaceBase):
 
     def __repr__(self):
         K = self.__class__
-        return '<%s.%s %s:%s@%s>' % (K.__module__, K.__name__, 
+        if self.wsid:
+            return '<%s.%s %s:%s@%s>' % (K.__module__, K.__name__, 
                 self.wsid, self.ns.name, self.ns.dbname)
+        else:
+            return '<%s.%s %s@%s>' % (K.__module__, K.__name__, 
+                self.ns.name, self.ns.dbname)
 
     def _asChangeset(self, cs=False):
         if cs is False:

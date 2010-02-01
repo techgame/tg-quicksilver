@@ -19,6 +19,11 @@ class BoundaryStoreRegistry(object):
         self.db_oid = {}
         self.db_ident = {}
 
+    def __nonzero__(self):
+        return True
+    def __len__(self):
+        return len(self.db_oid)
+
     def allLoadedOids(self):
         return self.db_oid.values()
 

@@ -93,6 +93,9 @@ def main():
         bs.ws.cs = qsh.head()
         print bs.ws.cs
 
+    print 'boundary store:', bs
+    print 'workspace:', bs.ws
+
     root = bs.get(100, None)
     if root is None:
         root = myModule.Root()
