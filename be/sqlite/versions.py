@@ -25,6 +25,7 @@ from . import workspace
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Versions(VersionsAbstract):
+    name = 'quicksilver'
     ns = VersionsAbstract.ns.copy()
     ns.payload = [('payload','BLOB'),('hash', 'BLOB')]
     ns.changeset = [('who', 'STRING')]
@@ -36,12 +37,20 @@ class Versions(VersionsAbstract):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def __init__(self, db, name='objectStore'):
-        self._loadDatabase(db)
-        self.ns = self.ns.branch(name=name)
+    def __init__(self, db, name=None):
+        if name is None:
+            name = self.name
         self.name = name
 
+        self._loadDatabase(db)
+        self.ns = self.ns.branch(name=name, dbname=self.dbname)
+
         self._initSchema()
+
+    def __repr__(self):
+        K = self.__class__
+        return '<%s.%s %s@%s>' % (K.__module__, K.__name__, 
+                self.ns.name, self.ns.dbname)
 
     conn = cur = None
     def _loadDatabase(self, db):
@@ -60,6 +69,10 @@ class Versions(VersionsAbstract):
         conn.row_factory = sqlite3.Row
         self.conn = conn
         self.cur = conn.cursor()
+
+        # pull the database name from the sqlite connection
+        r = conn.execute('PRAGMA database_list;').fetchone()
+        self.dbname = r[2]
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -20,6 +20,7 @@ from .extensions import BoundaryStats
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryVersions(Versions):
+    name = 'objects'
     ns = Versions.ns.copy()
     ns.payload = [
         ('hash','BLOB'),
