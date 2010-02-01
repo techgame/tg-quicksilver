@@ -106,7 +106,7 @@ class BoundaryStore(NotStorableMixin):
 
     def add(self, obj, deferred=False):
         return self.set(None, obj, deferred)
-    def set(self, oid, obj, deferred=False):
+    def set(self, oid, obj, deferred=False, onError=None):
         if oid is None:
             oid = self.ws.newOid()
 
@@ -119,10 +119,10 @@ class BoundaryStore(NotStorableMixin):
             return oid
 
         self._writeEntry(entry)
-        self._writeEntryCollection(self._iterNewEntries())
+        self._writeEntryCollection(self._iterNewEntries(), onError)
         return oid
 
-    def write(self, oid, deferred=False):
+    def write(self, oid, deferred=False, onError=None):
         entry = self.reg.lookup(oid)
         if entry is None:
             return None
@@ -132,7 +132,7 @@ class BoundaryStore(NotStorableMixin):
             return entry
 
         self._writeEntry(entry)
-        self._writeEntryCollection(self._iterNewEntries())
+        self._writeEntryCollection(self._iterNewEntries(), onError)
         return entry
 
     def delete(self, oid):
@@ -166,17 +166,17 @@ class BoundaryStore(NotStorableMixin):
         """Increments groupId to mark sets of changes to support in-changeset rollback"""
         return self.ws.nextGroupId()
 
-    def saveAll(self):
+    def saveAll(self, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewEntries(self.reg.allLoadedOids())
-        return self._writeEntryCollection(entryColl)
+        return self._writeEntryCollection(entryColl, onError)
 
-    def iterSaveAll(self):
+    def iterSaveAll(self, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewEntries(self.reg.allLoadedOids())
-        return self._iterWriteEntryCollection(entryColl)
+        return self._iterWriteEntryCollection(entryColl, onError)
 
     def commit(self, **kw):
         """Commits changeset to quicksilver backend store"""
