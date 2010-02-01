@@ -16,7 +16,7 @@
 
 class MetadataViewBase(object):
     def get(self, name, default=None):
-        return self.getMeta(name, None, default)
+        return self.getAt(name, None, default)
     def getAt(self, name, idx=None, default=None):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
