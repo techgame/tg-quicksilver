@@ -10,6 +10,7 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import os
 from .errors import WorkspaceError
 from ...mixins import NotStorableMixin
 
@@ -145,6 +146,13 @@ class WorkspaceBase(NotStorableMixin):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def _dbCommit(self):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+    def getDBName(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    dbname = property(lambda self: self.getDBName())
+    def getDBPath(self):
+        return os.path.dirname(self.getDBName())
+    dbpath = property(getDBPath)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ OID data operations

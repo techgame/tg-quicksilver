@@ -55,6 +55,10 @@ class Workspace(WorkspaceBase):
             return '<%s.%s %s@%s>' % (K.__module__, K.__name__, 
                 self.ns.name, self.ns.dbname)
 
+    def getDBName(self):
+        return self.ns.dbname
+    dbname = property(getDBName)
+
     def _asChangeset(self, cs=False):
         if cs is False:
             return self.cs

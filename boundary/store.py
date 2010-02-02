@@ -54,6 +54,13 @@ class BoundaryStore(NotStorableMixin):
         return self.ws.cs
     cs = property(getCs)
 
+    def getDBName(self):
+        return self.ws.getDBName()
+    dbname = property(getDBName)
+    def getDBPath(self):
+        return self.ws.getDBPath()
+    dbpath = property(getDBPath)
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Read Access: ref, get, raw
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
