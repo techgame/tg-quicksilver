@@ -73,7 +73,7 @@ class BoundaryEntry(NotStorableMixin):
     def awakenObject(self, obj):
         awaken = getattr(obj, '_awakenBoundary_', None)
         if awaken is not None:
-            awaken(self)
+            awaken(self, self.store().context)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
