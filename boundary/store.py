@@ -31,20 +31,24 @@ class BoundaryStore(NotStorableMixin):
     context = None
 
     def __init__(self, workspace):
-        self.init(workspace)
+        self._initWorkspace(workspace)
+        self.init()
 
     def __repr__(self):
         K = self.__class__
         return '<%s.%s open:%s>@%r' % (K.__module__, K.__name__, 
                 len(self.reg), self.cs)
 
-    def init(self, workspace):
+    def _initWorkspace(self, workspace):
         self.ws = workspace
         self.BoundaryEntry = self.BoundaryEntry.newFlyweight(self)
 
         self.reg = self.BoundaryStoreRegistry()
         self._deferredEntries = []
         self._ambitList = []
+
+    def init(self):
+        pass
 
     def getCs(self):
         return self.ws.cs
