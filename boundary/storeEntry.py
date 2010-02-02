@@ -35,7 +35,7 @@ class BoundaryEntry(NotStorableMixin):
 
     @classmethod
     def newFlyweight(klass, store, **kw):
-        kw.update(_wrStore=weakref.ref(store))
+        kw.update(store=weakref.ref(store))
         name = '%s_%s' % (klass.__name__, id(store))
         return type(klass)(name, (klass,), kw)
 
@@ -51,6 +51,7 @@ class BoundaryEntry(NotStorableMixin):
         self.obj = obj
         if obj is not None:
             self.RootProxy.adaptProxy(self.pxy, obj)
+            self.awakenObject(obj)
 
     def setDeferred(self, typeref):
         self._typeref = typeref
@@ -69,13 +70,18 @@ class BoundaryEntry(NotStorableMixin):
     def proxyBoundary(self, bndCtx):
         return self.oid
 
+    def awakenObject(self, obj):
+        awaken = getattr(obj, '_awakenBoundary_', None)
+        if awaken is not None:
+            awaken(self)
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    _wrStore = None
+    store = None
     def fetchObject(self):
         obj = self.obj
         if obj is None:
-            obj = self._wrStore().get(self.oid)
+            obj = self.store().get(self.oid)
         return obj
 
     def fetchProxyFn(self, name, args):
