@@ -41,6 +41,7 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
     def inBoundaryCtx(self, oid=None, obj=False):
         self.targetOid = oid
         self.bndCtx = self.context
+        self.callBoundaryOn(obj)
         yield None
 
     def objForRef(self, ref):
@@ -64,8 +65,6 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
         oid = self.oidForObj(obj)
         if oid is not None:
             if oid == self.targetOid:
-                # call boundary on the target for continuity
-                fnBoundary(self.bndCtx)
                 oid = None
             return oid
         else:
@@ -73,6 +72,18 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
             if ref is True: 
                 ref = self.store.set(None, obj, True)
             return ref or None
+
+    def callBoundaryOn(self, obj, bndCtx=False, _fastOutTypes_=_fastOutTypes_):
+        # this is basically the first part of refForObj, but guarenteed call of
+        # the _boundary_ method
+        if (obj.__class__ in _fastOutTypes_) or isinstance(obj, type):
+            return 
+
+        fnBoundary = getattr(obj, '_boundary_', False)
+        if fnBoundary: 
+            if bndCtx is False:
+                bndCtx = self.bndCtx
+            return fnBoundary(self.bndCtx)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Strategy with registerable custom types
