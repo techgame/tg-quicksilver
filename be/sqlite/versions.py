@@ -59,16 +59,14 @@ class Versions(VersionsAbstract):
 
         if isinstance(db, basestring):
             conn = sqlite3.connect(db,
-                    isolation_level=None,
                     detect_types=sqlite3.PARSE_DECLTYPES)
         else:
             db.executemany # ducktype test
             conn = db
-            conn.isolation_level = None
 
         conn.row_factory = sqlite3.Row
         self.conn = conn
-        self.cur = conn.cursor()
+        self.cur = self.conn.cursor()
 
         # pull the database name from the sqlite connection
         r = conn.execute('PRAGMA database_list;').fetchone()
@@ -82,13 +80,9 @@ class Versions(VersionsAbstract):
         schema.initOidSpace(self)
 
     def __enter__(self):
-        self.conn.execute('BEGIN TRANSACTION')
-
+        return self.conn.__enter__()
     def __exit__(self, excType, exc, tb):
-        if excType is None:
-            self.conn.commit()
-        else:
-            self.conn.rollback()
+        return self.conn.__exit__(excType, exc, tb)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Example verisons extension with more columns
