@@ -23,11 +23,12 @@ from .metadata import metadataView
 
 class VersionSchema(object):
     sqlObjects = [
-        'qs_changesets',
-        'qs_revlog',
-        'qs_version',
-        'qs_view',
-        'qs_meta', ]
+        'qs_changesets',    # changeset documentation, linking to qs_version
+        'qs_version',       # manifest of version to revlog entry
+        'qs_revlog',        # oid,revId -> data entry
+        'qs_meta',          # holds misc db information
+        'qs_oidpool',       # maintains a next oid by nodeid
+        ]
 
     def __init__(self, ns):
         self.ns = ns
@@ -58,10 +59,10 @@ class VersionSchema(object):
         self.initPragmas(conn)
         with conn:
             self.createRevisionlog()
-            self.createManifest()
+            self.createVersion()
             self.createChangesets()
-            self.createView()
             self.createMeta()
+            self.createOidPool()
 
     pragmas = {
         'synchronous': 'NORMAL',    # OFF | NORMAL | FULL
@@ -88,7 +89,7 @@ class VersionSchema(object):
 
         self.addColumnsTo('qs_revlog', 'payload')
 
-    def createManifest(self):
+    def createVersion(self):
         ns = self.ns
         self.cur.execute("""\
             create table if not exists %(qs_version)s (
@@ -103,13 +104,6 @@ class VersionSchema(object):
             create index if not exists %(qs_version)s_index 
                 on %(qs_version)s (versionId);""" % ns)
 
-    def createView(self):
-        self.cur.execute("""\
-            create view if not exists %(qs_view)s as 
-              select * from %(qs_version)s as S
-                join %(qs_revlog)s using (revId, oid)
-            ;""" % self.ns)
-                
     def createChangesets(self):
         ns = self.ns
         defs = self.ns.changesetDefs
@@ -138,6 +132,16 @@ class VersionSchema(object):
                 value,
                 primary key (name, idx));""" % self.ns)
 
+    def createOidPool(self):
+        self.cur.execute("""\
+            create table if not exists %(qs_oidpool)s (
+                nodeid integer primary key,
+                oid integer,
+                oid0 integer unique
+                );""" % self.ns)
+        self.cur.execute("insert or ignore into %(qs_oidpool)s "
+                "(oid, oid0, nodeid) values (1000, 1000, 0)" % self.ns)
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def addColumnsTo(self, table, columnKey):
@@ -157,55 +161,39 @@ class VersionSchema(object):
 
     metadataView = metadataView
 
-    def findOidRangeMax(self, oid0, oidSpace):
-        oid1 = oid0+oidSpace
-        stmt  = 'select max(oid) from %(qs_revlog)s \n' % self.ns
-        where = '  where ? <= oid and oid < ?'
-        r = self.cur.execute(stmt+where, (oid0, oid1))
-        oid = r.fetchone()[0]
-        if oid is not None: oid += 1
-        else: oid = oid0
-        return (oid, oid1)
-
-    def provisionNode(self, nodeId, nodeSpace, oidSpace, nodeTable):
-        oid0 = nodeTable[nodeId]
-        if oid0 is not None: 
-            return oid0
-
-        h = identhash.Int64IdentHasher()
-        h.addInt(nodeId)
-        h.addTimestamp()
-
-        allOidBases = set(e[1] for e in nodeTable)
-        allOidBases.add(0)
-
-        while 1:
-            oid0 = (int(h) % nodeSpace) * oidSpace
-            if oid0 not in allOidBases:
-                break
-
-        nodeTable[nodeId] = oid0
-        return oid0
-
     def initOidSpace(self, host, oidSpace=1<<36, nodeSpace=1<<27):
         if nodeSpace*oidSpace > (1L<<63):
-            raise AssertionError(repr(nodeSpace, oidSpace, nodeSpace*oidSpace))
+            raise ValueError(repr(nodeSpace, oidSpace, nodeSpace*oidSpace))
 
         meta = self.metadataView()
         oidSpace = meta.default('oid_space', oidSpace)
         nodeSpace = meta.default('node_space', nodeSpace)
         if nodeSpace*oidSpace > (1L<<63):
-            raise AssertionError(repr(nodeSpace, oidSpace, nodeSpace*oidSpace))
+            raise ValueError(repr(nodeSpace, oidSpace, nodeSpace*oidSpace))
 
-        oidRoot = self.findOidRangeMax(0, oidSpace)[0]
+        self.ns.globalId = 0
+        self.ns.nodeId = nodeId = utils.getnode()
+        self.provisionNode(nodeId, nodeSpace, oidSpace)
 
-        nodeId = utils.getnode()
-        oidNode = self.provisionNode(nodeId, nodeSpace, oidSpace, meta['nodeid_offset'])
-        oidNode = self.findOidRangeMax(oidNode, oidSpace)[0]
+    def provisionNode(self, nodeId, nodeSpace, oidSpace):
+        ex = self.cur.execute; ns = self.ns
+        r = ex("select oid from %(qs_oidpool)s where nodeid=?" % ns, (nodeId,))
+        r = r.fetchone()
+        if r is not None:
+            return r[0]
 
-        ns = self.ns
-        ns.nodeId = nodeId
-        ns.newRootOid = itertools.count(oidRoot).next
-        ns.newNodeOid = itertools.count(oidNode).next
-        ns.newOid = ns.newNodeOid
+        h = identhash.Int64IdentHasher()
+        h.addInt(nodeId)
+        h.addTimestamp()
+
+        q = ("insert into %(qs_oidpool)s (oid, oid0, nodeId) values (?, ?, ?)" % ns)
+        while 1:
+            oid0 = (int(h) % nodeSpace) * oidSpace
+            try:
+                ex(q, (oid0, oid0, nodeId))
+            except sqlite3.IntegrityError: 
+                h.addTimestamp()
+                continue
+
+            return oid0
 

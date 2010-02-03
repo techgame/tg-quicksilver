@@ -19,6 +19,7 @@ from . import versionsSchema
 from . import metadata
 from . import changesView
 from . import workspace
+from . import oidPool
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -30,6 +31,7 @@ class Versions(VersionsAbstract):
     ns.payload = [('payload','BLOB'),('hash', 'BLOB')]
     ns.changeset = [('who', 'STRING')]
 
+    NodeOidPool = oidPool.NodeOidPool
     Schema = versionsSchema.VersionSchema
     metadata = metadata.metadataView
     versions = changesView.changesView
@@ -75,9 +77,19 @@ class Versions(VersionsAbstract):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def _initSchema(self):
-        schema = self.Schema(self.ns)
-        schema.initStore(self.conn)
-        schema.initOidSpace(self)
+        with self.conn:
+            schema = self.Schema(self.ns)
+            schema.initStore(self.conn)
+            schema.initOidSpace(self)
+
+        # use a new connection to isolate transactions, so oids are always increasing
+        ns = self.ns
+
+        poolConn = self.conn
+        #poolConn = sqlite3.connect(self.dbname)
+        ns.newRootOid = self.NodeOidPool(self, poolConn, ns.globalId).next
+        ns.newNodeOid = self.NodeOidPool(self, poolConn, ns.nodeId).next
+        ns.newOid = ns.newNodeOid
 
     def __enter__(self):
         return self.conn.__enter__()
