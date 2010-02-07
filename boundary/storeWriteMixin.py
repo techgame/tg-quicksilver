@@ -10,6 +10,8 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import sys
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,13 +83,13 @@ class BoundaryStoreWriteMixin(object):
     def saveAll(self, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
-        entryColl = self._iterNewEntries(self.reg.allLoadedOids())
+        entryColl = self._iterNewEntries(self.reg.allLoadedEntries())
         return self._writeEntryCollection(entryColl, onError)
 
     def iterSaveAll(self, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
-        entryColl = self._iterNewEntries(self.reg.allLoadedOids())
+        entryColl = self._iterNewEntries(self.reg.allLoadedEntries())
         return self._iterWriteEntryCollection(entryColl, onError)
 
     def commit(self, **kw):

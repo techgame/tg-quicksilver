@@ -25,6 +25,8 @@ class BoundaryOidRegistry(object):
         return len(self.db_oid)
 
     def allLoadedOids(self):
+        return self.db_oid.keys()
+    def allLoadedEntries(self):
         return self.db_oid.values()
 
     def add(self, entry):
