@@ -35,8 +35,12 @@ class BoundaryEntry(NotStorableMixin):
 
     @classmethod
     def newFlyweight(klass, store, **kw):
-        kw.update(store=weakref.ref(store))
-        name = '%s_%s' % (klass.__name__, id(store))
+        if store is not None:
+            store=weakref.ref(store)
+            name = '%s_%s' % (klass.__name__, id(store))
+        else:
+            name = '%s_copier' % (klass.__name__,)
+        kw.update(store=store)
         return type(klass)(name, (klass,), kw)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
