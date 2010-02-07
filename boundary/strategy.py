@@ -10,7 +10,8 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import contextlib
+import weakref
+
 from . import ambit
 from .reference import BoundaryReferenceRegistry
 
@@ -27,25 +28,26 @@ _fastOutTypes_ = (
     bool, int, long, float, complex,
     tuple, list, set, dict, )
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
     """This strategy asks objects for a _boundary_(bndCtx) method.  If it
     exists, it is called.  It can return a new reference object, an oid, or
     True to generate a new oid"""
 
-    def __init__(self, store, context):
-        self.store = store
+    def __init__(self, store):
+        self.store = weakref.ref(store)
         self.oidForObj = store.reg.oidForObj
-        self.context = context
 
-    @contextlib.contextmanager
-    def inBoundaryCtx(self, oid=None, obj=False):
-        self.targetOid = oid
-        self.bndCtx = self.context
-        yield None
+    def inBoundaryCtx(self, entry, bndCtx):
+        self.targetEntry = entry
+        if entry is not None:
+            self.targetOid = entry.oid
+        self.bndCtx = bndCtx
 
     def objForRef(self, ref):
         if isinstance(ref, (int,long)):
-            return self.store.ref(ref)
+            return self.store().ref(ref)
 
         # use BoundaryReference.boundaryRef protocol
         return ref.boundaryRef(self, self.bndCtx)
@@ -69,7 +71,7 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
         else:
             ref = fnBoundary(self.bndCtx)
             if ref is True: 
-                ref = self.store.set(None, obj, True)
+                ref = self.store().set(None, obj, True)
             return ref or None
 
     def callBoundaryOn(self, obj, bndCtx=False, _fastOutTypes_=_fastOutTypes_):
@@ -114,7 +116,7 @@ class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
         else:
             ref = fnBoundary(self.bndCtx)
             if ref is True: 
-                ref = self.store.set(None, obj, True)
+                ref = self.store().set(None, obj, True)
             return ref or None
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -146,7 +148,7 @@ class BoundaryStrategyByType(BoundaryStrategy):
         else:
             ref = fnBoundary(self.bndCtx)
             if ref is True: 
-                ref = self.store.set(None, obj, True)
+                ref = self.store().set(None, obj, True)
             return ref or None
 
     def refForCustomType(self, refObj):

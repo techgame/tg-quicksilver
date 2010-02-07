@@ -21,7 +21,7 @@ from . import storeEntry, oidRegistry, strategy
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStore(NotStorableMixin):
-    BoundaryOidRegistry   = oidRegistry.BoundaryOidRegistry
+    BoundaryOidRegistry     = oidRegistry.BoundaryOidRegistry
     BoundaryEntry           = storeEntry.BoundaryEntry
     BoundaryStrategy        = strategy.BoundaryStrategy
     BoundaryAmbitCodec      = strategy.BoundaryAmbitCodec
@@ -211,39 +211,35 @@ class BoundaryStore(NotStorableMixin):
     #~ Utility: Entry read and write workhorses
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _hasEntry(self, entry):
+    def _hasEntry(self, entry, context=False):
         ref = self.ws.contains(entry.oid)
         if not ref:
             return False
 
-        with self.ambit() as ambit:
-            rec = self.ws.read(ref, 'typeref')
+        rec = self.ws.read(ref, 'typeref')
+        with self.ambit(entry, context) as ambit:
+            self.reg.add(entry)
             typeref = ambit.decodeTyperef(rec['typeref'])
             entry.setDeferred(typeref)
-
-        self.reg.add(entry)
         return True
 
-    def _readEntry(self, entry):
-        oid = entry.oid
-        with self.ambit() as ambit:
-            rec = self.ws.read(oid)
-            if rec is None:
-                return False
-            data = rec['payload']
-            if data is None:
-                return False
+    def _readEntry(self, entry, context=False):
+        rec = self.ws.read(entry.oid)
+        if rec is None:
+            return False
+        data = rec['payload']
+        if data is None:
+            return False
 
+        with self.ambit(entry, context) as ambit:
             self.reg.add(entry)
-
             data = self._decodeData(data)
-            obj = ambit.load(oid, data)
+            obj = ambit.load(data)
             hash = rec['hash']
             if hash: hash = bytes(hash)
             entry.setup(obj, hash)
             self._onRead(rec, data, entry)
-
-        self.reg.add(entry)
+            self.reg.add(entry)
         return True
 
     def _checkWriteEntry(self, entry):
@@ -251,19 +247,17 @@ class BoundaryStore(NotStorableMixin):
             return entry.dirty
         else: return True 
 
-    def _writeEntry(self, entry):
-        if not self._checkWriteEntry(entry):
+    def _writeEntry(self, entry, context=False):
+        if entry.obj is None:
+            return False, None
+        elif not self._checkWriteEntry(entry):
             return False, None
 
-        oid = entry.oid
-        obj = entry.obj
-        if obj is None:
-            return False, None
-
-        with self.ambit() as ambit:
-            data = ambit.dump(oid, obj)
+        with self.ambit(entry, context) as ambit:
+            self.reg.add(entry)
+            data = ambit.dump(entry.obj)
             # TODO: delegate expensive hashing
-            hash = ambit.hashDigest(oid, data)
+            hash = ambit.hashDigest(data)
             changed = (entry.hash != hash)
 
             if changed:
@@ -271,7 +265,7 @@ class BoundaryStore(NotStorableMixin):
                 self._onWrite(payload, data, entry)
 
                 typeref = ambit.encodeTyperef(entry.typeref())
-                seqId = self.ws.write(oid, 
+                seqId = self.ws.write(entry.oid, 
                     hash=buffer(hash), typeref=typeref, payload=payload)
                 entry.setHash(hash)
 
@@ -346,17 +340,26 @@ class BoundaryStore(NotStorableMixin):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @contextmanager
-    def ambit(self):
+    def ambit(self, entry, context=False):
         """Returns an ambit for the boundary store instance"""
+        ambit, releaseAmbit = self._acquireAmbit()
+
+        if context is False:
+            context = self.context
+
+        ambit.inBoundaryCtx(entry, context)
+        yield ambit
+        ambit.inBoundaryCtx(None, context)
+        releaseAmbit(ambit)
+
+    def _acquireAmbit(self):
         ambitList = self._ambitList
         if ambitList:
             ambit = ambitList.pop()
         else: 
-            boundary = self.BoundaryStrategy(self, self.context)
-            ambit = self.BoundaryAmbitCodec(boundary)
-
-        yield ambit
-        ambitList.append(ambit)
+            strategy = self.BoundaryStrategy(self)
+            ambit = self.BoundaryAmbitCodec(strategy)
+        return ambit, ambitList.append
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

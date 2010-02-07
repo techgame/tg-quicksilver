@@ -44,7 +44,7 @@ def changeData(bs, root):
             for x in xrange(10):
                 e.data.extend(myModule.genList(5, kl))
                 bs.mark(e)
-    elif 0:
+    elif 1:
         n = 0; nAdded = 0
         if len(root.data) < 50:
             root.data.extend(myModule.genList(5))

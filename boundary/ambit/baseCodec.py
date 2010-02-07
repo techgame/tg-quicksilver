@@ -31,26 +31,26 @@ class IBoundaryStrategy(object):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BaseAmbitCodec(NotStorableMixin):
-    def __init__(self, boundaryStrategy):
-        self.init(boundaryStrategy)
+    def __init__(self, strategy):
+        self.init(strategy)
 
-    def init(self, boundaryStrategy):
-        self.inBoundaryCtx = boundaryStrategy.inBoundaryCtx
-        self._initEncoder(boundaryStrategy.refForObj)
-        self._initDecoder(boundaryStrategy.objForRef)
+    def init(self, strategy):
+        self.inBoundaryCtx = strategy.inBoundaryCtx
+        self._initEncoder(strategy.refForObj)
+        self._initDecoder(strategy.objForRef)
 
     def _initEncoder(self, idForObj=None):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def _initDecoder(self, objForId=None):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
-    def dump(self, oid, obj):
+    def dump(self, obj):
         """Return serialized data from obj, and hash if hash is True"""
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def load(self, oid, data):
+    def load(self, data):
         """Return object unserialized from data"""
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def hashDigest(self, oid, data):
+    def hashDigest(self, data):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
 
