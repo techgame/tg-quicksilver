@@ -22,6 +22,8 @@ class MetadataView(MetadataViewBase):
         self.ns = host.ns
 
     def getAt(self, name, idx=None, default=None):
+        if idx is None: 
+            idx = ''
         stmt  = "select value from %(qs_meta)s \n" % self.ns
         where = "  where name=? and idx=? limit(1)"
         r = self.cur.execute(stmt+where, (name, idx))
@@ -39,6 +41,8 @@ class MetadataView(MetadataViewBase):
         return self.cur.execute(stmt+update, (name, idx, value))
 
     def deleteAt(self, name, idx):
+        if idx is None: 
+            idx = ''
         ex = self.cur.execute
         stmt  = 'delete from %(qs_meta)s where name=?' % self.ns
         if idx is not None: 
