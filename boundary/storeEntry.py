@@ -19,6 +19,16 @@ from .rootProxy import RootProxy, RootProxyRef
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+class _AnExampleEntryObject_(object):
+    """Use pickle protocol to handle persistence"""
+
+    def _boundary_(self, bndV, bndCtx):
+        return True # to allocated an oid
+    def _awakenBoundary_(self, bndEntry, bndCtx):
+        "to set state when fully loaded from boundary store"
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 class BoundaryEntry(NotStorableMixin):
     RootProxy = RootProxy
 

@@ -40,14 +40,20 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
         self.oidForObj = store.reg.oidForObj
 
     def inBoundaryCtx(self, entry, bndCtx):
-        self.targetEntry = entry
         if entry is not None:
             self.targetOid = entry.oid
+        else: self.targetOid = None
         self.bndCtx = bndCtx
+
+    def objForReservedId(self, oid):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     def objForRef(self, ref):
         if isinstance(ref, (int,long)):
-            return self.store().ref(ref)
+            if ref <= 0:
+                return self.objForReservedId(ref)
+            else:
+                return self.store().ref(ref)
 
         # use BoundaryReference.boundaryRef protocol
         return ref.boundaryRef(self, self.bndCtx)
@@ -69,7 +75,7 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
                 oid = None
             return oid
         else:
-            ref = fnBoundary(self.bndCtx)
+            ref = fnBoundary(self, self.bndCtx)
             if ref is True: 
                 ref = self.store().set(None, obj, True)
             return ref or None
@@ -84,7 +90,7 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
         if fnBoundary: 
             if bndCtx is False:
                 bndCtx = self.bndCtx
-            return fnBoundary(self.bndCtx)
+            return fnBoundary(self, self.bndCtx)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Strategy with registerable custom types
@@ -114,7 +120,7 @@ class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
                 oid = None
             return oid
         else:
-            ref = fnBoundary(self.bndCtx)
+            ref = fnBoundary(self, self.bndCtx)
             if ref is True: 
                 ref = self.store().set(None, obj, True)
             return ref or None
@@ -146,7 +152,7 @@ class BoundaryStrategyByType(BoundaryStrategy):
                 oid = None
             return oid
         else:
-            ref = fnBoundary(self.bndCtx)
+            ref = fnBoundary(self, self.bndCtx)
             if ref is True: 
                 ref = self.store().set(None, obj, True)
             return ref or None
