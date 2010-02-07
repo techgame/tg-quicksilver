@@ -81,7 +81,7 @@ class BoundaryEntry(NotStorableMixin):
             return self._typeref
         else: return obj.__class__
 
-    def proxyBoundary(self, bndCtx):
+    def proxyBoundary(self, bndV, bndCtx):
         return self.oid
 
     def awakenObject(self, obj):
