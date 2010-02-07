@@ -14,18 +14,18 @@ import sys
 from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
-from . import storeEntry, storeRegistry, storeStrategy
+from . import storeEntry, oidRegistry, strategy
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStore(NotStorableMixin):
-    BoundaryStoreRegistry   = storeRegistry.BoundaryStoreRegistry
+    BoundaryOidRegistry   = oidRegistry.BoundaryOidRegistry
     BoundaryEntry           = storeEntry.BoundaryEntry
-    BoundaryStrategy        = storeStrategy.BoundaryStrategy
-    BoundaryAmbitCodec      = storeStrategy.BoundaryAmbitCodec
-    BoundaryRefWalker       = storeStrategy.BoundaryRefWalker
+    BoundaryStrategy        = strategy.BoundaryStrategy
+    BoundaryAmbitCodec      = strategy.BoundaryAmbitCodec
+    BoundaryRefWalker       = strategy.BoundaryRefWalker
 
     saveDirtyOnly = True
     context = None
@@ -43,7 +43,7 @@ class BoundaryStore(NotStorableMixin):
         self.ws = workspace
         self.BoundaryEntry = self.BoundaryEntry.newFlyweight(self)
 
-        self.reg = self.BoundaryStoreRegistry()
+        self.reg = self.BoundaryOidRegistry()
         self._deferredEntries = []
         self._ambitList = []
 
@@ -64,6 +64,11 @@ class BoundaryStore(NotStorableMixin):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Read Access: ref, get, raw
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def oidForObj(self, obj):
+        entry = self.reg.lookup(obj)
+        if entry is not None:
+            return entry.oid
 
     def ref(self, oid):
         """Returns a deferred proxied to the object stored at oid"""

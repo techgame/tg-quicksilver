@@ -41,7 +41,6 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
     def inBoundaryCtx(self, oid=None, obj=False):
         self.targetOid = oid
         self.bndCtx = self.context
-        self.callBoundaryOn(obj)
         yield None
 
     def objForRef(self, ref):

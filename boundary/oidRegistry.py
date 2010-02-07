@@ -14,7 +14,7 @@
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class BoundaryStoreRegistry(object):
+class BoundaryOidRegistry(object):
     def __init__(self):
         self.db_oid = {}
         self.db_ident = {}
