@@ -15,8 +15,10 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStoreReadMixin(object):
+    _deferredReadEntries = None
     def _initReadStore(self): 
-        pass
+        if 'copier' in self.stateTags:
+            self._deferredReadEntries = []
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Read Access: ref, get, raw
@@ -79,6 +81,17 @@ class BoundaryStoreReadMixin(object):
         refs = self.BoundaryRefWalker().findRefs(data)
         return refs
 
+    def copy(self, oidOrObj, bsTarget=None):
+        entry = self.reg.lookup(oidOrObj)
+
+        cbs = self.newCopier(bsTarget)
+        cpyObj = cbs.get(entry.oid)
+
+        # load all referenced objects, so that they are in
+        # memory when the boundary store goes out of memory
+        cbs._loadDeferredProxies()
+        return cpyObj
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Workspace methods: commit, saveAll
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,6 +114,10 @@ class BoundaryStoreReadMixin(object):
             self.reg.add(entry)
             typeref = ambit.decodeTyperef(rec['typeref'])
             entry.setDeferred(typeref)
+
+        dl = self._deferredReadEntries
+        if dl is not None:
+            dl.append(entry)
         return True
 
     def _readEntry(self, entry, context=False):
@@ -121,6 +138,15 @@ class BoundaryStoreReadMixin(object):
             self._onRead(rec, data, entry)
             self.reg.add(entry)
         return True
+
+    def _loadDeferredProxies(self):
+        dl = self._deferredReadEntries
+        while dl:
+            dlNext = []
+            self._deferredReadEntries = dlNext
+            for e in dl:
+                e.fetchObject()
+            dl = dlNext
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

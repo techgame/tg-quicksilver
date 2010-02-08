@@ -31,6 +31,8 @@ class _AnExampleEntryObject_(object):
 
 class BoundaryEntry(NotStorableMixin):
     RootProxy = RootProxy
+    store = None
+    _storeStateTags = None
 
     def __init__(self, oid):
         self.oid = oid
@@ -45,12 +47,11 @@ class BoundaryEntry(NotStorableMixin):
 
     @classmethod
     def newFlyweight(klass, store, **kw):
-        if store is not None:
-            store=weakref.ref(store)
-            name = '%s_%s' % (klass.__name__, id(store))
-        else:
-            name = '%s_copier' % (klass.__name__,)
-        kw.update(store=store)
+        if store is None:
+            raise ValueError("Store cannot be None for flyweight")
+
+        kw.update(store=weakref.ref(store), _storeStateTags=store.stateTags)
+        name = '%s_%s' % (klass.__name__, id(store))
         return type(klass)(name, (klass,), kw)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -95,7 +96,10 @@ class BoundaryEntry(NotStorableMixin):
     def fetchObject(self):
         obj = self.obj
         if obj is None:
-            obj = self.store().get(self.oid)
+            # read the entry from store into self, and return the obj set on self
+            store = self.store()
+            if store._readEntry(self):
+                obj = self.obj
         return obj
 
     def fetchProxyFn(self, name, args):

@@ -32,6 +32,7 @@ class BoundaryStoreBase(NotStorableMixin):
     context = None
 
     def __init__(self, workspace):
+        self.stateTags = set()
         if workspace is not None:
             self.initWorkspace(workspace)
 
@@ -47,11 +48,8 @@ class BoundaryStoreBase(NotStorableMixin):
     def init(self):
         pass
 
-    def initStore(self, tgtStore=False):
-        if tgtStore is False:
-            tgtStore = self
-
-        self.BoundaryEntry = self.BoundaryEntry.newFlyweight(tgtStore)
+    def initStore(self):
+        self.BoundaryEntry = self.BoundaryEntry.newFlyweight(self)
         self.reg = self.BoundaryOidRegistry()
         self._ambitList = []
 
@@ -66,15 +64,35 @@ class BoundaryStoreBase(NotStorableMixin):
     def _initWriteStore(self): 
         pass
 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     def initWorkspace(self, workspace):
+        self.stateTags.add('workspace')
         self.ws = workspace
         return self.initStore()
-
     @classmethod
     def fromWorkspace(klass, workspace):
-        self = klass()
+        self = klass(None)
         self.initWorkspace(workspace)
         return self
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def initCopier(self, bs, bsTarget=None):
+        self.stateTags.add('copier')
+
+        self.ws = bs.ws
+        self.initStore()
+        if bsTarget is not None:
+            self.context = bsTarget.context
+        else: self.context = None
+        return self
+
+    def newCopier(self, bsTarget=None):
+        # bypass the standard workspace initialization and init the
+        # copier from this instance, using the context of target
+        cbs = self.__class__(None)
+        return cbs.initCopier(self, bsTarget)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Workspace methods

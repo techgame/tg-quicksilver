@@ -18,7 +18,7 @@ import sys
 
 class BoundaryStoreWriteMixin(object):
     def _initWriteStore(self):
-        self._deferredEntries = []
+        self._deferredWriteEntries = []
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Write Access: mark, add, set, delete
@@ -45,11 +45,11 @@ class BoundaryStoreWriteMixin(object):
         self.reg.add(entry)
 
         if deferred:
-            self._deferredEntries.append(entry)
+            self._deferredWriteEntries.append(entry)
             return oid
 
         self._writeEntry(entry)
-        self._writeEntryCollection(self._iterNewEntries(), onError)
+        self._writeEntryCollection(self._iterNewWriteEntries(), onError)
         return oid
 
     def write(self, oid, deferred=False, onError=None):
@@ -58,11 +58,11 @@ class BoundaryStoreWriteMixin(object):
             return None
 
         if deferred:
-            self._deferredEntries.append(entry)
+            self._deferredWriteEntries.append(entry)
             return entry
 
         self._writeEntry(entry)
-        self._writeEntryCollection(self._iterNewEntries(), onError)
+        self._writeEntryCollection(self._iterNewWriteEntries(), onError)
         return entry
 
     def __detitem__(self, oid):
@@ -83,13 +83,13 @@ class BoundaryStoreWriteMixin(object):
     def saveAll(self, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
-        entryColl = self._iterNewEntries(self.reg.allLoadedEntries())
+        entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
         return self._writeEntryCollection(entryColl, onError)
 
     def iterSaveAll(self, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
-        entryColl = self._iterNewEntries(self.reg.allLoadedEntries())
+        entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
         return self._iterWriteEntryCollection(entryColl, onError)
 
     def commit(self, **kw):
@@ -165,19 +165,19 @@ class BoundaryStoreWriteMixin(object):
                 else:
                     yield entry, r
 
-    def _iterNewEntries(self, entries=None):
+    def _iterNewWriteEntries(self, entries=None):
         if entries is not None:
             yield entries
 
-        entries = self._popNewEntries()
+        entries = self._popNewWriteEntries()
         while entries:
             yield entries
-            entries = self._popNewEntries()
+            entries = self._popNewWriteEntries()
 
-    def _popNewEntries(self):
-        entries = self._deferredEntries
+    def _popNewWriteEntries(self):
+        entries = self._deferredWriteEntries
         if entries:
-            self._deferredEntries = []
+            self._deferredWriteEntries = []
             return entries
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
