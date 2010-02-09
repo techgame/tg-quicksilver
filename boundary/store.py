@@ -91,8 +91,12 @@ class BoundaryStoreBase(NotStorableMixin):
     def newCopier(self, bsTarget=None):
         # bypass the standard workspace initialization and init the
         # copier from this instance, using the context of target
+        self._flushForCopier()
         cbs = self.__class__(None)
         return cbs.initCopier(self, bsTarget)
+
+    def _flushForCopier(self):
+        pass
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Workspace methods
