@@ -145,7 +145,9 @@ class BoundaryStoreEncodingMixin(object):
     """Payload encoding/decoding"""
 
     def _encodeData(self, data):
-        return buffer(data.encode('zlib'))
+        if len(data) >= 256:
+            data = data.encode('zlib')
+        return buffer(data)
     def _decodeData(self, payload):
         data = bytes(payload)
         if data.startswith('\x78\x9c'):
