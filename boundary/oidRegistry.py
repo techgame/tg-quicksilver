@@ -29,6 +29,11 @@ class BoundaryOidRegistry(object):
     def allLoadedEntries(self):
         return self.db_oid.values()
 
+    def alias(self, anObj, oidOrObj):
+        oid = self.lookup(oidOrObj).oid
+        self.db_ident[id(anObj)] = oid
+        return oid
+
     def add(self, entry):
         oid = entry.oid
         self.db_oid[oid] = entry
@@ -49,10 +54,10 @@ class BoundaryOidRegistry(object):
         self.db_ident.pop(id(entry.pxy), None)
         return entry
 
-    def lookup(self, oid, default=None):
-        if not isinstance(oid, (int, long)):
-            oid = self.db_ident[id(oid)]
-        return self.db_oid.get(oid, default)
+    def lookup(self, oidOrObj, default=None):
+        if not isinstance(oidOrObj, (int, long)):
+            oidOrObj = self.db_ident[id(oidOrObj)]
+        return self.db_oid.get(oidOrObj, default)
 
     def oidForObj(self, obj, default=None):
         return self.db_ident.get(id(obj), default)
