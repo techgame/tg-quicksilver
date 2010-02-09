@@ -51,8 +51,8 @@ class BoundaryStoreWriteMixin(object):
             self._deferredWriteEntries.append(entry)
             return oid
 
-        self._writeEntry(entry)
-        self._writeEntryCollection(self._iterNewWriteEntries(), onError)
+        entryColl = self._iterNewWriteEntries([entry])
+        self._writeEntryCollection(entryColl, onError)
         return oid
 
     def write(self, oid, deferred=False, onError=None):
@@ -64,8 +64,8 @@ class BoundaryStoreWriteMixin(object):
             self._deferredWriteEntries.append(entry)
             return entry
 
-        self._writeEntry(entry)
-        self._writeEntryCollection(self._iterNewWriteEntries(), onError)
+        entryColl = self._iterNewWriteEntries([entry])
+        self._writeEntryCollection(entryColl, onError)
         return entry
 
     def __detitem__(self, oid):
