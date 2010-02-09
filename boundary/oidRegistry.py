@@ -30,9 +30,10 @@ class BoundaryOidRegistry(object):
         return self.db_oid.values()
 
     def alias(self, anObj, oidOrObj):
-        oid = self.lookup(oidOrObj).oid
-        self.db_ident[id(anObj)] = oid
-        return oid
+        if not isinstance(oidOrObj, (int, long)):
+            oidOrObj = self.db_ident[id(oidOrObj)]
+        self.db_ident[id(anObj)] = oidOrObj
+        return oidOrObj
 
     def add(self, entry):
         oid = entry.oid
