@@ -52,7 +52,7 @@ class BoundaryStoreWriteMixin(object):
             return oid
 
         entryColl = self._iterNewWriteEntries([entry])
-        self._writeEntryCollection(entryColl, onError)
+        self._writeEntryCollection(entryColl, False, onError)
         return oid
 
     def write(self, oid, deferred=False, onError=None):
@@ -65,7 +65,7 @@ class BoundaryStoreWriteMixin(object):
             return entry
 
         entryColl = self._iterNewWriteEntries([entry])
-        self._writeEntryCollection(entryColl, onError)
+        self._writeEntryCollection(entryColl, False, onError)
         return entry
 
     def __detitem__(self, oid):
@@ -83,17 +83,17 @@ class BoundaryStoreWriteMixin(object):
         """Increments groupId to mark sets of changes to support in-changeset rollback"""
         return self.ws.nextGroupId()
 
-    def saveAll(self, onError=None):
+    def saveAll(self, context=False, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
-        return self._writeEntryCollection(entryColl, onError)
+        return self._writeEntryCollection(entryColl, context, onError)
 
-    def iterSaveAll(self, onError=None):
+    def iterSaveAll(self, context=False, onError=None):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
-        return self._iterWriteEntryCollection(entryColl, onError)
+        return self._iterWriteEntryCollection(entryColl, context, onError)
 
     def commit(self, **kw):
         """Commits changeset to quicksilver backend store"""
@@ -108,64 +108,65 @@ class BoundaryStoreWriteMixin(object):
             return entry.dirty
         else: return True 
 
-    def _writeEntry(self, entry, context=False):
+    def _writeEntry(self, entry, context=False, onError=None):
         if entry.obj is None:
             return False, None
         elif not self._checkWriteEntry(entry):
             return False, None
 
-        with self.ambit(entry, context) as ambit:
-            self.reg.add(entry)
-            data = ambit.dump(entry.obj)
-            # TODO: delegate expensive hashing
-            hash = ambit.hashDigest(data)
-            changed = (entry.hash != hash)
+        try:
+            with self.ambit(entry, context) as ambit:
+                self.reg.add(entry)
+                data = ambit.dump(entry.obj)
+                # TODO: delegate expensive hashing
+                hash = ambit.hashDigest(data)
+                changed = (entry.hash != hash)
 
-            if changed:
-                payload = self._encodeData(data)
-                self._onWrite(payload, data, entry)
+                if changed:
+                    payload = self._encodeData(data)
+                    self._onWrite(payload, data, entry)
 
-                typeref = ambit.encodeTyperef(entry.typeref())
-                seqId = self.ws.write(entry.oid, 
-                    hash=buffer(hash), typeref=typeref, payload=payload)
-                entry.setHash(hash)
+                    typeref = ambit.encodeTyperef(entry.typeref())
+                    seqId = self.ws.write(entry.oid, 
+                        hash=buffer(hash), typeref=typeref, payload=payload)
+                    entry.setHash(hash)
 
-                # TODO: process delegated hashing
-                ##if entry.hash != hash:
-                ##    self.ws.postUpdate(seqId, hash=buffer(hash))
-                ##    entry.setHash(hash)
-                ##else: self.ws.postBackout(seqId)
+                    # TODO: process delegated hashing
+                    ##if entry.hash != hash:
+                    ##    self.ws.postUpdate(seqId, hash=buffer(hash))
+                    ##    entry.setHash(hash)
+                    ##else: self.ws.postBackout(seqId)
+                pass
+        except Exception, exc:
+            if onError is None:
+                onError = self._onWriteError
+            if onError(entry, exc):
+                raise
+            return None
 
-        return changed, len(data)
+        else:
+            return changed, len(data)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Collection writing
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _writeEntryCollection(self, entryCollection, onError=None):
+    def _writeEntryCollection(self, entryCollection, context=False, onError=None):
         if onError is None:
             onError = self._onWriteError
         writeEntry = self._writeEntry
         for entries in entryCollection:
             for entry in entries:
-                try: 
-                    writeEntry(entry)
-                except Exception, exc:
-                    if onError(entry, exc):
-                        raise
+                writeEntry(entry, context, onError)
 
-    def _iterWriteEntryCollection(self, entryCollection, onError=None):
+    def _iterWriteEntryCollection(self, entryCollection, context=False, onError=None):
         if onError is None:
             onError = self._onWriteError
         writeEntry = self._writeEntry
         for entries in entryCollection:
             for entry in entries:
-                try: 
-                    r = writeEntry(entry)
-                except Exception, exc:
-                    if onError(entry, exc):
-                        raise
-                else:
+                r = writeEntry(entry, context, onError)
+                if r is not None:
                     yield entry, r
 
     def _iterNewWriteEntries(self, entries=None):
