@@ -155,19 +155,21 @@ class BoundaryStoreWriteMixin(object):
         if onError is None:
             onError = self._onWriteError
         writeEntry = self._writeEntry
-        for entries in entryCollection:
-            for entry in entries:
-                writeEntry(entry, context, onError)
+        with self.ws.conn:
+            for entries in entryCollection:
+                for entry in entries:
+                    writeEntry(entry, context, onError)
 
     def _iterWriteEntryCollection(self, entryCollection, context=False, onError=None):
         if onError is None:
             onError = self._onWriteError
         writeEntry = self._writeEntry
-        for entries in entryCollection:
-            for entry in entries:
-                r = writeEntry(entry, context, onError)
-                if r is not None:
-                    yield entry, r
+        with self.ws.conn:
+            for entries in entryCollection:
+                for entry in entries:
+                    r = writeEntry(entry, context, onError)
+                    if r is not None:
+                        yield entry, r
 
     def _iterNewWriteEntries(self, entries=None):
         if entries is not None:
