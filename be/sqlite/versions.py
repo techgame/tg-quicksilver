@@ -86,7 +86,6 @@ class Versions(VersionsAbstract):
         ns = self.ns
 
         poolConn = self.conn
-        #poolConn = sqlite3.connect(self.dbname)
         ns.newRootOid = self.NodeOidPool(self, poolConn, ns.globalId).next
         ns.newNodeOid = self.NodeOidPool(self, poolConn, ns.nodeId).next
         ns.newOid = ns.newNodeOid

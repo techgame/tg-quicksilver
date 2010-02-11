@@ -257,21 +257,27 @@ class Workspace(WorkspaceBase):
     def writeEx(self, oid, dataItems):
         if oid is None:
             oid = self.newOid()
-        op = Ops.Write(self)
-        return op.perform(oid, dataItems)
+
+        with self.conn:
+            op = Ops.Write(self)
+            return op.perform(oid, dataItems)
 
     def remove(self, oid):
         if oid is None:
             return False
-        op = Ops.Remove(self)
-        return op.perform(oid)
+
+        with self.conn:
+            op = Ops.Remove(self)
+            return op.perform(oid)
 
     def postUpdate(self, seqId, **data):
-        op = Ops.PostUpdate(self)
-        return op.perform(seqId, data)
+        with self.conn:
+            op = Ops.PostUpdate(self)
+            return op.perform(seqId, data)
     def postBackout(self, seqId):
-        op = Ops.Backout(self)
-        return op.perform(seqId)
+        with self.conn:
+            op = Ops.Backout(self)
+            return op.perform(seqId)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
