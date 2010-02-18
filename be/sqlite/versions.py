@@ -86,7 +86,7 @@ class Versions(VersionsAbstract):
         ns = self.ns
 
         poolConn = self.conn
-        ns.newRootOid = self.NodeOidPool(self, poolConn, ns.globalId).next
+        ns.newRootOid = self.NodeOidPool(self, poolConn, 0).next
         ns.newNodeOid = self.NodeOidPool(self, poolConn, ns.nodeId).next
         ns.newOid = ns.newNodeOid
 

@@ -13,7 +13,6 @@
 import itertools
 import sqlite3
 
-from ..base.utils import identhash
 from . import utils
 from .metadata import metadataView
 
@@ -39,6 +38,7 @@ class VersionSchema(object):
         for k in self.sqlObjects:
             ns[k] = '%s_%s' % (name, k)
 
+        ns.nodeId = utils.getnode()
         self._nsDefineItem(ns, 'payload')
         self._nsDefineItem(ns, 'changeset')
 
@@ -133,22 +133,23 @@ class VersionSchema(object):
                 primary key (name, idx));""" % self.ns)
 
     def createOidPool(self):
-        self.cur.execute("""\
-            create table if not exists %(qs_oidpool)s (
+        ex = self.cur.execute; ns = self.ns
+        ex("""create table if not exists %(qs_oidpool)s (
                 nodeid integer primary key,
                 oid integer,
                 oid0 integer unique
-                );""" % self.ns)
-        self.cur.execute("insert or ignore into %(qs_oidpool)s "
-                "(oid, oid0, nodeid) values (1000, 1000, 0)" % self.ns)
+                );""" % ns)
+        r = ex("select oid0 from %(qs_oidpool)s where nodeid=0" % ns).fetchone()
+        if r is None:
+            ex("insert or ignore into %(qs_oidpool)s "
+                "(oid, oid0, nodeid) values (1000, 1000, 0)" % ns)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def addColumnsTo(self, table, columnKey):
         """Allows adding payload columns to a revlog or changeset tables"""
-        ns = self.ns
+        ex = self.cur.execute; ns = self.ns
         table = ns[table]
-        ex = self.cur.execute
         for cName, cDef in ns[columnKey+'List']:
             try:
                 ex("alter table %s add column %s %s;" % (table, cName, cDef))
@@ -162,38 +163,10 @@ class VersionSchema(object):
     metadataView = metadataView
 
     def initOidSpace(self, host, oidSpace=1<<36, nodeSpace=1<<27):
-        if nodeSpace*oidSpace > (1L<<63):
-            raise ValueError(repr(nodeSpace, oidSpace, nodeSpace*oidSpace))
-
         meta = self.metadataView()
         oidSpace = meta.default('oid_space', oidSpace)
         nodeSpace = meta.default('node_space', nodeSpace)
         if nodeSpace*oidSpace > (1L<<63):
             raise ValueError(repr(nodeSpace, oidSpace, nodeSpace*oidSpace))
-
-        self.ns.globalId = 0
-        self.ns.nodeId = nodeId = utils.getnode()
-        self.provisionNode(nodeId, nodeSpace, oidSpace)
-
-    def provisionNode(self, nodeId, nodeSpace, oidSpace):
-        ex = self.cur.execute; ns = self.ns
-        r = ex("select oid from %(qs_oidpool)s where nodeid=?" % ns, (nodeId,))
-        r = r.fetchone()
-        if r is not None:
-            return r[0]
-
-        h = identhash.Int64IdentHasher()
-        h.addInt(nodeId)
-        h.addTimestamp()
-
-        q = ("insert into %(qs_oidpool)s (oid, oid0, nodeId) values (?, ?, ?)" % ns)
-        while 1:
-            oid0 = (int(h) % nodeSpace) * oidSpace
-            try:
-                ex(q, (oid0, oid0, nodeId))
-            except sqlite3.IntegrityError: 
-                h.addTimestamp()
-                continue
-
-            return oid0
+        self.ns.oidNodeSpace = oidSpace, nodeSpace
 
