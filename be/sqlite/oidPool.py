@@ -28,23 +28,13 @@ class NodeOidPool(object):
         qs %= (ns.qs_oidpool, nodeId)
         self._qs = qs
 
-        genNodeOid = self.provisionNode(nodeId, ns)
-        for e in genNodeOid: 
-            self.next = partial(self._nextEx, genNodeOid)
-            break
+        self.bindProvisionNode(nodeId, ns)
 
-    def _nextEx(self, genNodeOid):
-        # remove the monkeypatch
-        del self.next
+    def newOid(self):
+        return self._incNodeOid()
+    __call__ = next = newOid
 
-        # finish the generator
-        for e in genNodeOid: 
-            pass
-
-        # return the result
-        return self.next()
-
-    def next(self):
+    def _incNodeOid(self):
         conn = self.conn
         with conn:
             r = conn.execute(self._qinc)
@@ -58,26 +48,37 @@ class NodeOidPool(object):
                 r = r[0]
         return r
 
-    def provisionNode(self, nodeId, ns):
+    def current(self):
         r = self.conn.execute(self._qs).fetchone()
         if r is not None:
-            return
+            return r[0]
 
-        h = identhash.Int64IdentHasher()
-        h.addInt(nodeId)
-        h.addTimestamp()
+    def bindProvisionNode(self, nodeId, ns):
+        if self.current() is not None:
+            return False
 
-        oidSpace, nodeSpace = ns.oidNodeSpace
-        q = ("insert into %s (oid, oid0, nodeId) values (?, ?, %s)" % (ns.qs_oidpool, nodeId))
-        yield
+        def provisionNode():
+            h = identhash.Int64IdentHasher()
+            h.addInt(nodeId)
+            h.addTimestamp()
 
-        ex = self.conn.execute
-        while 1:
-            oid0 = (int(h) % nodeSpace) * oidSpace
-            try:
-                ex(q, (oid0, oid0))
-            except IntegrityError: 
-                h.addTimestamp()
-                continue
-            return
+            oidSpace, nodeSpace = ns.oidNodeSpace
+            q = ("insert into %s (oid, oid0, nodeId) values (?, ?, %s)" % (ns.qs_oidpool, nodeId))
+
+            ex = self.conn.execute
+            while 1:
+                oid0 = (int(h) % nodeSpace) * oidSpace
+                try:
+                    ex(q, (oid0, oid0))
+                except IntegrityError: 
+                    h.addTimestamp()
+                else: break
+
+            # remove monkeypatch, and continue as normal
+            del self._incNodeOid
+            return oid0
+
+        # Create monkeypatch to provision the node on first access
+        self._incNodeOid = provisionNode
+        return True
 

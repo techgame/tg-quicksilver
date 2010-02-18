@@ -86,8 +86,8 @@ class Versions(VersionsAbstract):
         ns = self.ns
 
         poolConn = self.conn
-        ns.newRootOid = self.NodeOidPool(self, poolConn, 0).next
-        ns.newNodeOid = self.NodeOidPool(self, poolConn, ns.nodeId).next
+        ns.newRootOid = self.NodeOidPool(self, poolConn, 0)
+        ns.newNodeOid = self.NodeOidPool(self, poolConn, ns.nodeId)
         ns.newOid = ns.newNodeOid
 
     def __enter__(self):
