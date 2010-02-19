@@ -45,6 +45,9 @@ class BoundaryStoreBase(NotStorableMixin):
     #~ Initialization
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def initContext(self):
+        pass
+
     def init(self):
         pass
 
@@ -55,6 +58,9 @@ class BoundaryStoreBase(NotStorableMixin):
 
         self._initReadStore()
         self._initWriteStore()
+
+        if self.context is None:
+            self.initContext()
 
         self.init()
         return self
@@ -78,14 +84,15 @@ class BoundaryStoreBase(NotStorableMixin):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def initCopier(self, bs, bsTarget=None):
+    def isCopier(self):
+        return 'copier' in self.stateTags
+    def initCopier(self, bsSource, bsTarget=None):
         self.stateTags.add('copier')
-
-        self.ws = bs.ws
-        self.initStore()
         if bsTarget is not None:
             self.context = bsTarget.context
-        else: self.context = None
+
+        self.ws = bsSource.ws
+        self.initStore()
         return self
 
     def newCopier(self, bsTarget=None):
@@ -93,10 +100,11 @@ class BoundaryStoreBase(NotStorableMixin):
         # copier from this instance, using the context of target
         self._flushForCopier()
         cbs = self.__class__(None)
-        return cbs.initCopier(self, bsTarget)
+        cbs.initCopier(self, bsTarget)
+        return cbs
 
     def _flushForCopier(self):
-        pass
+        self.saveAll()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Workspace methods

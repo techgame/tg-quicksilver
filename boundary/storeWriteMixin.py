@@ -19,9 +19,6 @@ import sys
 class BoundaryStoreWriteMixin(object):
     def _initWriteStore(self):
         self._deferredWriteEntries = []
-    def _flushForCopier(self):
-        self.saveAll()
-        super(BoundaryStoreWriteMixin, self)._flushForCopier()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Write Access: mark, add, set, delete

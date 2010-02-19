@@ -15,10 +15,9 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryStoreReadMixin(object):
-    _deferredReadEntries = None
     def _initReadStore(self): 
-        if 'copier' in self.stateTags:
-            self._deferredReadEntries = []
+        if self.isCopier():
+            self._clearDeferredProxies()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Read Access: ref, get, raw
@@ -33,6 +32,8 @@ class BoundaryStoreReadMixin(object):
         """Returns a deferred proxied to the object stored at oid"""
         entry = self.reg.lookup(oid)
         if entry is not None:
+            if entry.obj is None:
+                self._addDeferredRef(entry)
             return entry.pxy
 
         entry = self.BoundaryEntry(oid)
@@ -84,12 +85,17 @@ class BoundaryStoreReadMixin(object):
     def copy(self, oidOrObj, bsTarget=None):
         entry = self.reg.lookup(oidOrObj)
 
-        cbs = self.newCopier(bsTarget)
-        cpyObj = cbs.get(entry.oid)
+        self = self.newCopier(bsTarget)
+
+        # clear any refernces from initialization
+        self._clearDeferredProxies()
+
+        cpyObj = self.get(entry.oid)
 
         # load all referenced objects, so that they are in
         # memory when the boundary store goes out of memory
-        cbs._loadDeferredProxies()
+        self._loadDeferredProxies()
+
         return cpyObj
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -115,9 +121,7 @@ class BoundaryStoreReadMixin(object):
             typeref = ambit.decodeTyperef(rec['typeref'])
             entry.setDeferred(typeref)
 
-        dl = self._deferredReadEntries
-        if dl is not None:
-            dl.append(entry)
+        self._addDeferredRef(entry)
         return True
 
     def _readEntry(self, entry, context=False):
@@ -139,11 +143,22 @@ class BoundaryStoreReadMixin(object):
             self.reg.add(entry)
         return True
 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ deferred reference handling ~~~~~~~~~~~~~~~~~~~~~~
+
+    def _addDeferredRef(self, entry):
+        dl = self._deferredReadEntries
+        if dl is not None:
+            dl.add(entry)
+
+    _deferredReadEntries = None
+    def _clearDeferredProxies(self):
+        self._deferredReadEntries = set()
+
     def _loadDeferredProxies(self):
         dl = self._deferredReadEntries
         while dl:
-            dlNext = []
-            self._deferredReadEntries = dlNext
+            self._deferredReadEntries = dlNext = set()
             for e in dl:
                 e.fetchObject()
             dl = dlNext
