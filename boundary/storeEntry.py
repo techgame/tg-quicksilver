@@ -75,6 +75,7 @@ class BoundaryEntry(NotStorableMixin):
         self.RootProxy.adaptDeferred(self.pxy, self)
 
     def setupAsCopy(self, srcEntry):
+        self.pxy = srcEntry.pxy
         self.awakenObject = self._awakenObjectCopy
         self.setObject(srcEntry.obj)
 
