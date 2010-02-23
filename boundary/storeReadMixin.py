@@ -31,6 +31,7 @@ class BoundaryStoreReadMixin(object):
     def ref(self, oid):
         """Returns a deferred proxied to the object stored at oid"""
         entry = self.reg.lookup(oid)
+
         if entry is not None:
             if entry.obj is None:
                 self._addDeferredRef(entry)
@@ -46,7 +47,8 @@ class BoundaryStoreReadMixin(object):
 
     def get(self, oid, default=NotImplemented):
         """Returns a transparent proxied to object stored at oid"""
-        entry = self.reg.lookup(oid, None)
+        entry = self.reg.lookup(oid)
+
         if entry is None:
             entry = self.BoundaryEntry(oid)
         elif entry.obj is not None:
@@ -62,6 +64,7 @@ class BoundaryStoreReadMixin(object):
     def raw(self, oidOrObj, decode=True):
         """Returns the raw database record for the oidOrObj"""
         entry = self.reg.lookup(oidOrObj)
+
         if entry is None: 
             oid = long(oidOrObj)
         else: oid = entry.oid
@@ -90,14 +93,18 @@ class BoundaryStoreReadMixin(object):
         # clear any refernces from initialization
         self._clearDeferredProxies()
 
-        cpyObj = self.get(entry.oid)
+        with self.inContextForCopy(bsTarget):
+            cpyObj = self.ref(entry.oid)
 
-        # load all referenced objects, so that they are in
-        # memory when the boundary store goes out of memory
-        self._loadDeferredProxies()
+            # load all referenced objects, so that they are in
+            # memory when the boundary store goes out of memory
+            self._loadDeferredProxies()
 
         return cpyObj
 
+    def inContextForCopy(self, bsTarget):
+        return self.BoundaryEntry.inContextForCopy(self, bsTarget)
+        
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Workspace methods: commit, saveAll
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -161,6 +168,13 @@ class BoundaryStoreReadMixin(object):
             self._deferredReadEntries = dlNext = set()
             for e in dl:
                 e.fetchObject()
+            dl = dlNext
+
+    def _iterDeferredProxies(self):
+        dl = self._deferredReadEntries
+        while dl:
+            self._deferredReadEntries = dlNext = set()
+            yield dl
             dl = dlNext
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

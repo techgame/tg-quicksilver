@@ -11,6 +11,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import weakref
+from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
 from .rootProxy import RootProxy, RootProxyRef
@@ -26,13 +27,14 @@ class _AnExampleEntryObject_(object):
         return True # to allocated an oid
     def _awakenBoundary_(self, bndEntry, bndCtx):
         "to set state when fully loaded from boundary store"
+    def _awakenCopyBoundary_(self, bndEntry, bndCtx):
+        "to set state on a copy operation.  Called before awakenBoundary"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BoundaryEntry(NotStorableMixin):
     RootProxy = RootProxy
     store = None
-    _storeStateTags = None
 
     def __init__(self, oid):
         self.oid = oid
@@ -50,7 +52,7 @@ class BoundaryEntry(NotStorableMixin):
         if store is None:
             raise ValueError("Store cannot be None for flyweight")
 
-        kw.update(store=weakref.ref(store), _storeStateTags=store.stateTags)
+        kw.update(store=weakref.ref(store))
         name = '%s_%s' % (klass.__name__, id(store))
         return type(klass)(name, (klass,), kw)
 
@@ -72,6 +74,10 @@ class BoundaryEntry(NotStorableMixin):
         self._typeref = typeref
         self.RootProxy.adaptDeferred(self.pxy, self)
 
+    def setupAsCopy(self, srcEntry):
+        self.awakenObject = self._awakenObjectCopy
+        self.setObject(srcEntry.obj)
+
     def setHash(self, hash):
         self.hash = hash
         self.dirty = not hash
@@ -85,10 +91,48 @@ class BoundaryEntry(NotStorableMixin):
     def proxyBoundary(self, bndV, bndCtx):
         return self.oid
 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def getContext(self):
+        return self.store().context
+    context = property(getContext)
+
     def awakenObject(self, obj):
+        self._awakenObjectLoad(obj)
+
+    def _awakenObjectLoad(self, obj):
         awaken = getattr(obj, '_awakenBoundary_', None)
         if awaken is not None:
             awaken(self, self.store().context)
+
+    def _awakenObjectCopy(self, obj):
+        del self.awakenObject
+
+        awakenCopy = getattr(obj, '_awakenCopyBoundary_', None)
+        if awakenCopy is not None:
+            awakenCopy(self, self.store().context)
+
+        self._awakenObjectLoad(obj)
+
+    def _awakenObjectCopier(self, obj):
+        self.bsCopyTarget.addEntryCopy(self)
+
+    bsCopyTarget = None
+    @classmethod
+    @contextmanager
+    def inContextForCopy(klass, bsSrc, bsTarget):
+        if klass.bsCopyTarget is not None:
+            raise RuntimeError("Nested copy context detected: bsCopyTarget is not None")
+
+        klass.bsCopyTarget = bsTarget
+        klass.awakenObject = klass._awakenObjectCopier
+        try:
+            ##bsSrc.reg.clear()
+            yield
+            ##bsSrc.reg.clear()
+        finally:
+            klass.awakenObject = klass._awakenObjectLoad
+            klass.bsCopyTarget = None
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -11,6 +11,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import sys
+from contextlib import contextmanager
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -30,13 +31,19 @@ class BoundaryStoreWriteMixin(object):
             entry.dirty = dirty
         return entry
 
-    def add(self, obj, deferred=False):
-        return self.set(None, obj, deferred)
-
-    def __setitem__(self, oid, obj):
-        return self.set(oid, obj)
+    def add(self, obj, deferred=False, onError=None):
+        entry = self.setEntry(None, obj, deferred, onError)
+        return entry.oid
+    append = add
 
     def set(self, oid, obj, deferred=False, onError=None):
+        entry = self.setEntry(oid, obj, deferred, onError)
+        return entry.oid
+
+    def __setitem__(self, oid, obj):
+        self.setEntry(oid, obj)
+
+    def setEntry(self, oid, obj, deferred=False, onError=None):
         if oid is None:
             oid = self.ws.newOid()
 
@@ -46,13 +53,30 @@ class BoundaryStoreWriteMixin(object):
 
         if deferred:
             self._deferredWriteEntries.append(entry)
-            return oid
+            return entry
 
         entryColl = self._iterNewWriteEntries([entry])
         self._writeEntryCollection(entryColl, False, onError)
-        return oid
+        return entry
+
+    def addEntryCopy(self, fgnEntry):
+        if fgnEntry.store() is self:
+            raise RuntimeError("Foreign Entry is not foreign")
+
+        oid = self.ws.newOid()
+        entry = self.BoundaryEntry(oid)
+        entry.setupAsCopy(fgnEntry)
+        self.reg.add(entry)
+
+        self._deferredWriteEntries.append(entry)
+        return entry
 
     def write(self, oid, deferred=False, onError=None):
+        entry = self.writeEntry(oid, deferred, onError)
+        if entry is not None:
+            return entry.oid
+
+    def writeEntry(self, oid, deferred=False, onError=None):
         entry = self.reg.lookup(oid)
         if entry is None:
             return None
@@ -65,12 +89,13 @@ class BoundaryStoreWriteMixin(object):
         self._writeEntryCollection(entryColl, False, onError)
         return entry
 
-    def __detitem__(self, oid):
-        return self.delete(oid)
+    def __delitem__(self, oidOrObj):
+        self.delete(oidOrObj)
 
-    def delete(self, oid):
-        self.reg.remove(oid)
-        self.ws.remove(oid)
+    def delete(self, oidOrObj):
+        entry = self.reg.lookup(oidOrObj)
+        self.reg.remove(entry.oid)
+        self.ws.remove(entry.oid)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Workspace methods: commit, saveAll

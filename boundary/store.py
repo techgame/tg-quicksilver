@@ -53,15 +53,13 @@ class BoundaryStoreBase(NotStorableMixin):
 
     def initStore(self):
         self.BoundaryEntry = self.BoundaryEntry.newFlyweight(self)
-        self.reg = self.BoundaryOidRegistry()
+        self.reg = self.BoundaryOidRegistry(self.BoundaryEntry)
         self._ambitList = []
 
         self._initReadStore()
         self._initWriteStore()
 
-        if self.context is None:
-            self.initContext()
-
+        self.initContext()
         self.init()
         return self
 
@@ -88,8 +86,6 @@ class BoundaryStoreBase(NotStorableMixin):
         return 'copier' in self.stateTags
     def initCopier(self, bsSource, bsTarget=None):
         self.stateTags.add('copier')
-        if bsTarget is not None:
-            self.context = bsTarget.context
 
         self.ws = bsSource.ws
         self.initStore()
