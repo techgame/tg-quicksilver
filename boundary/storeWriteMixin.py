@@ -44,12 +44,17 @@ class BoundaryStoreWriteMixin(object):
         self.setEntry(oid, obj)
 
     def setEntry(self, oid, obj, deferred=False, onError=None):
+        entry = self.reg.lookup(obj)
+        if entry is not None:
+            oid = entry.oid
+
         if oid is None:
             oid = self.ws.newOid()
 
-        entry = self.BoundaryEntry(oid)
-        entry.setup(obj, None)
-        self.reg.add(entry)
+        if entry is None:
+            entry = self.BoundaryEntry(oid)
+            entry.setup(obj, None)
+            self.reg.add(entry)
 
         if deferred:
             self._deferredWriteEntries.append(entry)

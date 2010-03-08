@@ -68,7 +68,9 @@ class BoundaryOidRegistry(object):
     def lookup(self, oidOrObj, default=None):
         if not isinstance(oidOrObj, (int, long)):
             if not isinstance(oidOrObj, self.BoundaryEntry):
-                oidOrObj = self.db_ident[id(oidOrObj)]
+                oidOrObj = self.db_ident.get(id(oidOrObj))
+                if oidOrObj is None:
+                    return default
             else: oidOrObj = oidOrObj.oid
         return self.db_oid.get(oidOrObj, default)
 
