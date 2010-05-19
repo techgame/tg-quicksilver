@@ -23,7 +23,7 @@ BoundaryAmbitCodec = ambit.PickleAmbitCodec
 BoundaryRefWalker = ambit.PickleRefWalker
 
 _fastOutTypes_ = (
-    type(None), type, 
+    None, type(None), type, 
     str, unicode, 
     bool, int, long, float, complex,
     tuple, list, set, dict, )
@@ -60,7 +60,7 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
 
     def refForObj(self, obj, _fastOutTypes_=_fastOutTypes_):
         # this is one long method to keep it fast
-        if obj.__class__ in _fastOutTypes_:
+        if getattr(obj, '__class__', None) in _fastOutTypes_:
             return
         if isinstance(obj, type): 
             return # We don't accept type based sentinals
@@ -83,7 +83,9 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
     def callBoundaryOn(self, obj, bndCtx=False, _fastOutTypes_=_fastOutTypes_):
         # this is basically the first part of refForObj, but guarenteed call of
         # the _boundary_ method
-        if (obj.__class__ in _fastOutTypes_) or isinstance(obj, type):
+        if getattr(obj, '__class__', None) in _fastOutTypes_:
+            return
+        if isinstance(obj, type):
             return 
 
         fnBoundary = getattr(obj, '_boundary_', False)
@@ -99,7 +101,7 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
 class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
     def refForObj(self, obj, _fastOutTypes_=_fastOutTypes_):
         # this is one long method to keep it fast
-        if obj.__class__ in _fastOutTypes_:
+        if getattr(obj, '__class__', None) in _fastOutTypes_:
             return
         if isinstance(obj, type): 
             return # We don't accept type based sentinals
@@ -130,7 +132,7 @@ class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
 class BoundaryStrategyByType(BoundaryStrategy):
     def refForObj(self, obj, _fastOutTypes_=_fastOutTypes_):
         # this is one long method to keep it fast
-        if obj.__class__ in _fastOutTypes_:
+        if getattr(obj, '__class__', None) in _fastOutTypes_:
             return
         if isinstance(obj, type): 
             return # We don't accept type based sentinals
