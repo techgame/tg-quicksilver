@@ -122,14 +122,15 @@ class Workspace(WorkspaceBase):
             if state in s:
                 break
     def fetchVersions(self, cs, state='mark'):
-        ex = self.cur.execute; ns = self.ns
+        ex = self.cur.executemany; ns = self.ns
         self.checkCommited()
 
         versions = self._iterLineageToState(cs, state)
-        r = ex("""\
-            insert or ignore into %(ws_version)s
-                select * from %(qs_version)s
-                    where versionId=?;""" % ns, versions)
+        q = ('insert or ignore into %(ws_version)s \n'
+             '    (oid, revId, versionId, flags) \n'
+             '  select * from %(qs_version)s where versionId=?;') % ns
+
+        r = ex(q, list(versions))
         return r.rowcount
 
     def markCheckout(self):
@@ -151,6 +152,7 @@ class Workspace(WorkspaceBase):
         return count
 
     def clearWorkspace(self):
+        ex = self.cur.execute; ns = self.ns
         self.checkCommited()
         ex("delete from %(ws_version)s;"%ns)
 

@@ -50,9 +50,9 @@ class WorkspaceSchema(object):
               versionId INTEGER,
               flags INTEGER,
 
-              seqId INTEGER,
+              seqId INTEGER default null,
 
-              ws_versionId INTEGER, ws_revId INTEGER);""" % self.ns)
+              ws_versionId INTEGER default null, ws_revId INTEGER default null);""" % self.ns)
         self.addColumnsTo(cur, 'ws_log', 'payload')
 
     def createChangesetLog(self, cur):
