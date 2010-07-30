@@ -20,7 +20,8 @@ import myModule
 out = None
 def test(aList):
     global out
-    out, hash = bs.dump(aList)
+    out = bs.dump(aList)
+    hash = bs.hashDigest(out)
     print 'aList:', len(aList)
     print 'out:', len(out)
     bm = len(out)
@@ -42,7 +43,6 @@ def test(aList):
 
 if __name__=='__main__':
     bs = myModule.DemoCodec()
-    bs.init()
     test(myModule.myData)
 
     if 1:

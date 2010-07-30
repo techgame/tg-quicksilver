@@ -34,11 +34,11 @@ class A(object):
         return 0
 
 class B(A): 
-    def _boundary_(self, bndCtx):
+    def _boundary_(self, bndS, bndCtx):
         return False
 
 class C(B): 
-    def _boundary_(self, bndCtx):
+    def _boundary_(self, bndS, bndCtx):
         return True
 
 class Root(B):
@@ -68,15 +68,22 @@ myData = [C(), B(), A(), C(), A(), B(), C()]
 connect(myData)
 
 class DemoCodec(PickleAmbitCodec):
+    class DemoStrategy(object):
+        def __init__(self):
+            self._map = {}
+
+        def inBoundaryCtx(self, entry, bndCtx):
+            pass
+
+        def refForObj(self, obj):
+            if getattr(obj, '__bounded__', None):
+                self._map[id(obj)] = obj
+                return id(obj)
+
+        def objForRef(self, ref):
+            return self._map[anId]
+
     def __init__(self):
-        self.init(self.persistent_id, self.persistent_load)
-
-    _map = {}
-    def persistent_id(self, obj):
-        if getattr(obj, '__bounded__', None):
-            self._map[id(obj)] = obj
-            return id(obj)
-
-    def persistent_load(self, anId):
-        return self._map[anId]
+        strategy = self.DemoStrategy()
+        super(DemoCodec, self).__init__(strategy)
 

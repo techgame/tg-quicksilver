@@ -39,13 +39,9 @@ if __name__=='__main__':
         print ws.cs
         ws.checkout()
 
-    for e in ws.readAll():
-        #print e
-        print e.oid, str(e.payload)
-
     if 1:
-        oid = None
-        #oid = 42
+        #oid = None
+        oid = 42
         print
         print "adding new thingy at:", oid
         print
@@ -55,10 +51,6 @@ if __name__=='__main__':
 
             ws.write(oid, payload=buffer(data))
             ws.commit()
-
-        for e in ws.readAll():
-            #print e
-            print e.oid, str(e.payload)
 
     if 0:
         r = qsh.lineage()
