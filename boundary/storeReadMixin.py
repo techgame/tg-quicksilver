@@ -10,6 +10,9 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import sys
+from .errors import OidLookupError
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -58,7 +61,7 @@ class BoundaryStoreReadMixin(object):
         if self._readEntry(entry):
             return entry.pxy
         elif default is NotImplemented:
-            raise LookupError("No object found for oid: %r" % (oid,), oid)
+            raise OidLookupError("No object found for oid: %r" % (oid,), oid)
         return default
 
     def raw(self, oidOrObj, decode=True):
@@ -117,7 +120,7 @@ class BoundaryStoreReadMixin(object):
     #~ Utility: Entry read workhorses
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _hasEntry(self, entry, context=False):
+    def _hasEntry(self, entry, context=False, onError=None):
         ref = self.ws.contains(entry.oid)
         if not ref:
             return False
@@ -125,21 +128,30 @@ class BoundaryStoreReadMixin(object):
         rec = self.ws.read(ref, 'typeref, entryMeta')
         entry.setMeta(rec['entryMeta'])
 
-        with self.ambit(entry, context) as ambit:
-            self.reg.add(entry)
-            try:
-                typeref = ambit.decodeTyperef(rec['typeref'])
-            except Exception, err:
-                r = entry.decodeFailure(err, rec['typeref'])
-                if r is None: raise
-                return r
-            else:
-                entry.setDeferred(typeref)
+        try:
+            with self.ambit(entry, context) as ambit:
+                self.reg.add(entry)
+                try:
+                    typeref = ambit.decodeTyperef(rec['typeref'])
+                except Exception, err:
+                    r = entry.decodeFailure(err, rec['typeref'])
+                    if r is None: raise
+                    return r
+                else:
+                    entry.setDeferred(typeref)
 
-        self._addDeferredRef(entry)
-        return True
+        except Exception, exc:
+            if onError is None:
+                onError = self._onReadError
+            if onError(entry, exc, rec['typeref']):
+                raise
+            return False
 
-    def _readEntry(self, entry, context=False):
+        else:
+            self._addDeferredRef(entry)
+            return True
+
+    def _readEntry(self, entry, context=False, onError=None):
         rec = self.ws.read(entry.oid)
         if rec is None:
             return False
@@ -149,23 +161,31 @@ class BoundaryStoreReadMixin(object):
         if data is None:
             return False
 
-        with self.ambit(entry, context) as ambit:
-            self.reg.add(entry)
-            data = self._decodeData(data)
-            try:
-                obj = ambit.load(data)
-            except Exception, err:
-                r = entry.decodeFailure(err, rec['typeref'])
-                if r is None: raise
-                return r
-
-            else:
-                hash = rec['hash']
-                if hash: hash = bytes(hash)
-
-                entry.setup(obj, hash)
-                self._onRead(rec, data, entry)
+        try:
+            with self.ambit(entry, context) as ambit:
                 self.reg.add(entry)
+                data = self._decodeData(data)
+                try:
+                    obj = ambit.load(data)
+                except Exception, err:
+                    r = entry.decodeFailure(err, rec['typeref'])
+                    if r is None: raise
+                    return r
+
+                else:
+                    hash = rec['hash']
+                    if hash: hash = bytes(hash)
+
+                    entry.setup(obj, hash)
+                    self._onRead(rec, data, entry)
+                    self.reg.add(entry)
+        except Exception, exc:
+            if onError is None:
+                onError = self._onReadError
+            if onError(entry, exc, rec['typeref']):
+                raise
+            return False
+
         return True
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -201,4 +221,8 @@ class BoundaryStoreReadMixin(object):
         pass
     def _onReadRaw(self, rec, data):
         pass
+
+    def _onReadError(self, entry, exc, sz_typeref=None):
+        sys.excepthook(*sys.exc_info())
+        print >> sys.stderr, 'entry %r, typeref %r' % (entry, sz_typeref)
 

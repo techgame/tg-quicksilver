@@ -10,6 +10,12 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-from .versions import BoundaryVersions, BoundaryStore
-from .errors import OidLookupError
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ Definitions 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class OidLookupError(LookupError):
+    def __init__(self, msg, oid):
+        LookupError.__init__(self, msg)
+        self.oid = oid
 
