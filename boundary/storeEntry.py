@@ -45,9 +45,13 @@ class BoundaryEntry(NotStorableMixin):
 
     def __repr__(self):
         k = self.__class__
+        if self._typeref is False:
+            return '<%s.%s oid:%s>' % (
+                k.__module__, k.__name__, self.oid)
+
         return '<%s.%s oid:%s>@%r' % (
-                k.__module__, k.__name__, 
-                self.oid, self.pxy)
+            k.__module__, k.__name__, 
+            self.oid, self.pxy)
 
     @classmethod
     def newFlyweight(klass, store, **kw):
@@ -79,7 +83,7 @@ class BoundaryEntry(NotStorableMixin):
         if hash is not False:
             self.setHash(hash)
 
-    def decodeFailure(self, err, strTyperef):
+    def decodeFailure(self, err, sz_typeref):
         if not self.hasGhost(): return
 
         if isinstance(err, AttributeError):
@@ -105,7 +109,7 @@ class BoundaryEntry(NotStorableMixin):
         self.hash = hash
         self.dirty = not hash
 
-    _typeref = None
+    _typeref = False
     def typeref(self):
         obj = self.obj
         if obj is None:
