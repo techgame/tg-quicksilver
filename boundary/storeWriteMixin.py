@@ -176,7 +176,7 @@ class BoundaryStoreWriteMixin(object):
                 onError = self._onWriteError
             if onError(entry, exc):
                 raise
-            return None
+            return False, None
 
         else:
             return changed, len(data)
