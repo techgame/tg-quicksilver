@@ -72,7 +72,7 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
         oid = self.oidForObj(obj)
         if oid is not None:
             if oid == self.targetOid:
-                oid = None
+                return None
             return oid
         else:
             ref = fnBoundary(self, self.bndCtx)
@@ -109,7 +109,8 @@ class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
         # test for custom ref types that don't support _boundary_ protocol
         # using isinstance, and delegate responsibility to refForCustomType
         if isinstance(obj, self.customRefTypes):
-            return self.refForCustomType(obj)
+            oid = self.refForCustomType(obj)
+            if oid is not None: return oid
 
         # common boundary protocol:
         fnBoundary = getattr(obj, '_boundary_', False)
@@ -119,7 +120,7 @@ class BoundaryStrategy(BasicBoundaryStrategy, BoundaryReferenceRegistry):
         oid = self.oidForObj(obj)
         if oid is not None:
             if oid == self.targetOid:
-                oid = None
+                return None
             return oid
         else:
             ref = fnBoundary(self, self.bndCtx)
@@ -141,7 +142,8 @@ class BoundaryStrategyByType(BoundaryStrategy):
         # using issubclass(type(obj)) to bypass proxy trickery, and delegate
         # responsibility to refForCustomType
         if issubclass(type(obj), self.customRefTypes):
-            return self.refForCustomType(obj)
+            oid = self.refForCustomType(obj)
+            if oid is not None: return oid
 
         # common boundary protocol:
         fnBoundary = getattr(obj, '_boundary_', False)
@@ -151,7 +153,7 @@ class BoundaryStrategyByType(BoundaryStrategy):
         oid = self.oidForObj(obj)
         if oid is not None:
             if oid == self.targetOid:
-                oid = None
+                return None
             return oid
         else:
             ref = fnBoundary(self, self.bndCtx)
