@@ -26,6 +26,7 @@ class BoundaryVersions(Versions):
         ('hash','BLOB'),
         ('typeref','TEXT'),
         ('payload','BLOB'),
+        ('entryMeta','BLOB'),
         ]
     ns.changeset = [
         ('note', 'text default null'),

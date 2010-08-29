@@ -122,11 +122,19 @@ class BoundaryStoreReadMixin(object):
         if not ref:
             return False
 
-        rec = self.ws.read(ref, 'typeref')
+        rec = self.ws.read(ref, 'typeref, entryMeta')
+        entry.setMeta(rec['entryMeta'])
+
         with self.ambit(entry, context) as ambit:
             self.reg.add(entry)
-            typeref = ambit.decodeTyperef(rec['typeref'])
-            entry.setDeferred(typeref)
+            try:
+                typeref = ambit.decodeTyperef(rec['typeref'])
+            except Exception, err:
+                r = entry.decodeFailure(err, rec['typeref'])
+                if r is None: raise
+                return r
+            else:
+                entry.setDeferred(typeref)
 
         self._addDeferredRef(entry)
         return True
@@ -135,6 +143,8 @@ class BoundaryStoreReadMixin(object):
         rec = self.ws.read(entry.oid)
         if rec is None:
             return False
+
+        entry.setMeta(rec['entryMeta'])
         data = rec['payload']
         if data is None:
             return False
@@ -142,12 +152,20 @@ class BoundaryStoreReadMixin(object):
         with self.ambit(entry, context) as ambit:
             self.reg.add(entry)
             data = self._decodeData(data)
-            obj = ambit.load(data)
-            hash = rec['hash']
-            if hash: hash = bytes(hash)
-            entry.setup(obj, hash)
-            self._onRead(rec, data, entry)
-            self.reg.add(entry)
+            try:
+                obj = ambit.load(data)
+            except Exception, err:
+                r = entry.decodeFailure(err, rec['typeref'])
+                if r is None: raise
+                return r
+
+            else:
+                hash = rec['hash']
+                if hash: hash = bytes(hash)
+
+                entry.setup(obj, hash)
+                self._onRead(rec, data, entry)
+                self.reg.add(entry)
         return True
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

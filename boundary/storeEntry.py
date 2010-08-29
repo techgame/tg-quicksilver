@@ -29,6 +29,8 @@ class _AnExampleEntryObject_(object):
         "to set state when fully loaded from boundary store"
     def _awakenCopyBoundary_(self, bndEntry, bndCtx):
         "to set state on a copy operation.  Called before awakenBoundary"
+    def _updateBoundary_(self, bndEntry, bndCtx):
+        "to prepare object for hibernation"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -58,11 +60,31 @@ class BoundaryEntry(NotStorableMixin):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def getMeta(self):
+        return self.ghostOid
+    def setMeta(self, data):
+        if data is None: return
+
+        if isinstance(data, (int, long)):
+            self.ghostOid = data
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def isActive(self):
+        return self.obj is not None
+
     def setup(self, obj=False, hash=False):
         if obj is not False:
             self.setObject(obj)
         if hash is not False:
             self.setHash(hash)
+
+    def decodeFailure(self, err, strTyperef):
+        if not self.hasGhost(): return
+
+        if isinstance(err, AttributeError):
+            self.setDeferred(None)
+            return True
 
     def setObject(self, obj):
         self.obj = obj
@@ -83,6 +105,7 @@ class BoundaryEntry(NotStorableMixin):
         self.hash = hash
         self.dirty = not hash
 
+    _typeref = None
     def typeref(self):
         obj = self.obj
         if obj is None:
@@ -99,12 +122,12 @@ class BoundaryEntry(NotStorableMixin):
     context = property(getContext)
 
     def awakenObject(self, obj):
-        self._awakenObjectLoad(obj)
+        return self._awakenObjectLoad(obj)
 
     def _awakenObjectLoad(self, obj):
         awaken = getattr(obj, '_awakenBoundary_', None)
         if awaken is not None:
-            awaken(self, self.store().context)
+            return awaken(self, self.store().context)
 
     def _awakenObjectCopy(self, obj):
         del self.awakenObject
@@ -113,7 +136,7 @@ class BoundaryEntry(NotStorableMixin):
         if awakenCopy is not None:
             awakenCopy(self, self.store().context)
 
-        self._awakenObjectLoad(obj)
+        return self._awakenObjectLoad(obj)
 
     def _awakenObjectCopier(self, obj):
         self.bsCopyTarget.addEntryCopy(self)
@@ -128,28 +151,69 @@ class BoundaryEntry(NotStorableMixin):
         klass.bsCopyTarget = bsTarget
         klass.awakenObject = klass._awakenObjectCopier
         try:
-            ##bsSrc.reg.clear()
             yield
-            ##bsSrc.reg.clear()
         finally:
             klass.awakenObject = klass._awakenObjectLoad
             klass.bsCopyTarget = None
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    store = None
+    def hibernate(self):
+        obj = self.obj
+        updateBoundary = getattr(obj, '_updateBoundary_', None)
+        if updateBoundary is not None:
+            updateBoundary(self, self.store().context)
+        return self.obj, self.getMeta()
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def hasGhost(self):
+        return self.ghostOid is not None
+
+    ghostOid = None
+    def getGhostObj(self):
+        g_oid = self.ghostOid
+        if g_oid is not None:
+            return self.store().get(g_oid)
+    def setGhostObj(self, g_obj):
+        if g_obj is not None:
+            g_oid = self.store().add(g_obj)
+        else: g_oid = None
+        self.ghostOid = g_oid
+    def delGhostObj(self):
+        self.ghostOid = None
+        del self.ghostOid
+    ghostObj = property(getGhostObj, setGhostObj, delGhostObj)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    _ghost_obj = None
     def fetchObject(self):
         obj = self.obj
+        if obj is not None:
+            return obj
+
+        obj = self._ghost_obj
+        if obj is not None:
+            return obj
+
+        # read the entry from store into self
+        if not self.store()._readEntry(self):
+            return None
+
+        # return the obj set on self
+        obj = self.obj
+
         if obj is None:
-            # read the entry from store into self, and return the obj set on self
-            store = self.store()
-            if store._readEntry(self):
-                obj = self.obj
+            # unless there was a readFailure
+            obj = self.getGhostObj()
+            self._ghost_obj = obj
+            self._typeref = obj.__class__
         return obj
 
     def fetchProxyFn(self, name, args):
         obj = self.fetchObject()
-        return getattr(self.obj, name, None)
+        return getattr(obj, name, None)
 
     _fetchRemapAttr = {'__class__':'_typeref', '_boundary_':'proxyBoundary'}
     def fetchProxyAttr(self, name, _remap_=_fetchRemapAttr):
@@ -158,5 +222,5 @@ class BoundaryEntry(NotStorableMixin):
             return getattr(self, rn)
 
         obj = self.fetchObject()
-        return getattr(self.obj, name)
+        return getattr(obj, name)
 

@@ -137,15 +137,17 @@ class BoundaryStoreWriteMixin(object):
         else: return True 
 
     def _writeEntry(self, entry, context=False, onError=None):
-        if entry.obj is None:
+        if not entry.isActive():
             return False, None
         elif not self._checkWriteEntry(entry):
             return False, None
 
         try:
+            obj, entryMeta = entry.hibernate()
+
             with self.ambit(entry, context) as ambit:
                 self.reg.add(entry)
-                data = ambit.dump(entry.obj)
+                data = ambit.dump(obj)
                 # TODO: delegate expensive hashing
                 hash = ambit.hashDigest(data)
                 changed = (entry.hash != hash)
@@ -155,8 +157,12 @@ class BoundaryStoreWriteMixin(object):
                     self._onWrite(payload, data, entry)
 
                     typeref = ambit.encodeTyperef(entry.typeref())
-                    seqId = self.ws.write(entry.oid, 
-                        hash=buffer(hash), typeref=typeref, payload=payload)
+                    seqId = self.ws.write(
+                        entry.oid, 
+                        hash=buffer(hash),
+                        typeref=typeref,
+                        payload=payload, 
+                        entryMeta=entryMeta)
                     entry.setHash(hash)
 
                     # TODO: process delegated hashing
