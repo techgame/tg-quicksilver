@@ -83,9 +83,13 @@ def saveData(bs, qsh, saveDirtyOnly=None):
     with qsh:
         bs.saveAll()
 
+def openBoundaryStore():
+    dbFn = os.path.splitext(__file__)[0]+'.qag'
+    qsh = BoundaryVersions(dbFn, 'obj')
+    return qsh
 
 def main():
-    qsh = BoundaryVersions('db_quicksilver.qag', 'obj')
+    qsh = openBoundaryStore()
     bs = qsh.boundaryWorkspace(stats=True)
 
     print 'bs.ws.cs:', bs.ws.cs

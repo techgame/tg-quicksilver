@@ -33,6 +33,9 @@ class A(object):
         if c: return c
         return 0
 
+    def answer(self):
+        return 42
+
 class B(A): 
     def _boundary_(self, bndS, bndCtx):
         return False

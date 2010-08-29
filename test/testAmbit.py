@@ -18,38 +18,36 @@ import myModule
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 out = None
-def test(aList):
+def ambit_list(aList):
     global out
     out = bs.dump(aList)
     hash = bs.hashDigest(out)
-    print 'aList:', len(aList)
-    print 'out:', len(out)
     bm = len(out)
     for e in ['zlib', 'bz2']:
         sc = len(out.encode(e))
-        print '  %s: %s B,  %.2f%% compressed' % (e, sc, 100*float(sc)/bm)
-        t = timeit.Timer('out.encode(%r)'%(e,), 'from __main__ import out')
-        t = t.timeit(10)/10.
-        print '    @ %6.3f s, %.4f MBps' % (t, len(out)/(t*(1<<20)))
-
-    print
+        out.encode(e)
 
     rezList = bs.load(out)
     assert aList == rezList
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~ Main 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-if __name__=='__main__':
+bs = None
+def setup():
+    global bs
     bs = myModule.DemoCodec()
-    test(myModule.myData)
+
+def testAmbit():
+    ambit_list(myModule.myData)
 
     if 1:
         bl = myModule.genList(20)
-        test(bl)
+        ambit_list(bl)
 
     if 1:
         bl = myModule.genList(100)
-        test(bl)
+        ambit_list(bl)
+
+
+def teardown():
+    global bs
+    del bs
 
