@@ -61,6 +61,7 @@ class Versions(VersionsAbstract):
 
         if isinstance(db, basestring):
             conn = sqlite3.connect(db,
+                    check_same_thread=False,
                     detect_types=sqlite3.PARSE_DECLTYPES)
         else:
             db.executemany # ducktype test
