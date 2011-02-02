@@ -41,7 +41,12 @@ class Workspace(WorkspaceBase):
         self._initSchema()
         self._initStoredCS()
 
+    _mutable = True
+    def isMutable(self):
+        return self._mutable
+
     def setHost(self, host):
+        self._mutable = host.isMutable()
         self.ns = host.ns.copy()
         self.conn = host.conn
         self.cur = host.cur

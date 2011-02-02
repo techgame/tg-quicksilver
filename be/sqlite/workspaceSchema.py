@@ -42,6 +42,9 @@ class WorkspaceSchema(object):
             self.createWorking(cur)
             self.createChangesetLog(cur)
 
+            if 'db_branch' in self.ns:
+                self.initFromBranch(cur)
+
     def createWorking(self, cur):
         cur.execute("""\
             create %(temp)s table if not exists %(ws_version)s (
@@ -83,4 +86,12 @@ class WorkspaceSchema(object):
         ns = self.ns
         cur.execute("drop table if exists %(ws_log)s;" % ns)
         cur.execute("drop table if exists %(ws_version)s;" % ns)
+
+    def initFromBranch(self, cur):
+        ns = self.ns
+        try: 
+            cur.execute("insert or replace into %(ws_version)s select * from %(db_branch)s.%(ws_version)s;" % ns)
+            cur.execute("insert or replace into %(ws_log)s select * from %(db_branch)s.%(ws_log)s;" % ns)
+        except sqlite3.OperationalError: 
+            pass
 

@@ -25,6 +25,7 @@ class VersionSchema(object):
         'qs_changesets',    # changeset documentation, linking to qs_version
         'qs_version',       # manifest of version to revlog entry
         'qs_revlog',        # oid,revId -> data entry
+        #'qs_view',
         'qs_meta',          # holds misc db information
         'qs_oidpool',       # maintains a next oid by nodeid
         ]
@@ -61,6 +62,7 @@ class VersionSchema(object):
             self.createRevisionlog()
             self.createVersion()
             self.createChangesets()
+            self.createView()
             self.createMeta()
             self.createOidPool()
 
@@ -124,6 +126,14 @@ class VersionSchema(object):
               %s);""" % (ns.qs_changesets, comma, defs))
         self.addColumnsTo('qs_changesets', 'changeset')
 
+    def createView(self):
+        return 
+        self.cur.execute("""\
+            create view if not exists %(qs_view)s as 
+                select * from %(qs_version)s as S
+                join %(qs_revlog)s using (revId, oid)
+            ;""" % self.ns)
+    
     def createMeta(self):
         self.cur.execute("""\
             create table if not exists %(qs_meta)s (
@@ -170,3 +180,21 @@ class VersionSchema(object):
             raise ValueError(repr(nodeSpace, oidSpace, nodeSpace*oidSpace))
         self.ns.oidNodeSpace = oidSpace, nodeSpace
 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Entire database branching
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def initFromBranch(self, dbBranch, conn):
+        if dbBranch is None:
+            return None
+        
+        dbName = 'db_branch'
+        self.ns['db_branch'] = dbName
+        conn.execute('ATTACH DATABASE ? as ?', (dbBranch, dbName))
+        with conn:
+            ns = self.ns
+            for k in self.sqlObjects:
+                k = ns[k]
+                try: conn.execute('insert or replace into %s select * from %s.%s' % (k,dbName,k))
+                except sqlite3.OperationalError: 
+                    pass

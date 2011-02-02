@@ -41,6 +41,9 @@ class BoundaryStoreBase(NotStorableMixin):
         return '<%s.%s open:%s>@%r' % (K.__module__, K.__name__, 
                 len(self.reg), self.cs)
 
+    def isMutable(self):
+        return self.ws.isMutable()
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Initialization
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

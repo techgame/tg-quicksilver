@@ -30,6 +30,9 @@ class WorkspaceBase(NotStorableMixin):
 
     csCheckout = None
 
+    def isMutable(self):
+        return True
+
     _csWorking = None
     def getCSWorking(self, create=True):
         cs = self._csWorking

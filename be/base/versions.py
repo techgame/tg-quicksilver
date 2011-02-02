@@ -37,3 +37,6 @@ class VersionsAbstract(NotStorableMixin):
     def heads(self, *args, **kw): 
         return self.versions().heads(*args, **kw)
 
+    def isMutable(self):
+        return True
+

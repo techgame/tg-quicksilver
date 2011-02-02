@@ -39,26 +39,32 @@ class Versions(VersionsAbstract):
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def __init__(self, db, name=None):
+    def __init__(self, db, name=None, mutable=True):
         if name is None:
             name = self.name
         self.name = name
+        self.ns = self.ns.branch(name=name)
 
-        self._loadDatabase(db)
-        self.ns = self.ns.branch(name=name, dbname=self.dbname)
+        if mutable:
+            self._loadDatabase(db)
+            self._initSchema()
+        else:
+            # use an un-named temp db, instead of a fully in-memory db
+            self._loadDatabase('', db)
+            self._initSchema(db)
 
-        self._initSchema()
+        self._mutable = mutable
+
+    _mutable = True
+    def isMutable(self):
+        return self._mutable
 
     def __repr__(self):
         K = self.__class__
         return '<%s.%s %s@%s>' % (K.__module__, K.__name__, 
                 self.ns.name, self.ns.dbname)
 
-    conn = cur = None
-    def _loadDatabase(self, db):
-        if self.conn is not None:
-            raise RuntimeError("Database is already loaded")
-
+    def _openDatabase(self, db):
         if isinstance(db, basestring):
             conn = sqlite3.connect(db,
                     check_same_thread=False,
@@ -68,20 +74,34 @@ class Versions(VersionsAbstract):
             conn = db
 
         conn.row_factory = sqlite3.Row
-        self.conn = conn
+        return conn
+
+    conn = cur = None
+    def _loadDatabase(self, db, dbname=None):
+        if self.conn is not None:
+            raise RuntimeError("Database is already loaded")
+
+        self.conn = conn = self._openDatabase(db)
         self.cur = self.conn.cursor()
 
         # pull the database name from the sqlite connection
-        r = conn.execute('PRAGMA database_list;').fetchone()
-        self.dbname = r[2]
+        if dbname is None:
+            r = conn.execute('PRAGMA database_list;').fetchone()
+            dbname = r[2]
+
+        self.dbname = dbname
+        self.ns = self.ns.branch(dbname=self.dbname)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _initSchema(self):
+    def _initSchema(self, dbBranch=None):
         with self.conn:
             schema = self.Schema(self.ns)
             schema.initStore(self.conn)
             schema.initOidSpace(self)
+
+        if dbBranch is not None:
+            schema.initFromBranch(dbBranch, self.conn)
 
         # use a new connection to isolate transactions, so oids are always increasing
         ns = self.ns
