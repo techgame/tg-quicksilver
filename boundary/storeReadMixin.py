@@ -85,7 +85,9 @@ class BoundaryStoreReadMixin(object):
     def findRefsFrom(self, oidOrObj):
         """Returns a set of oids referenced by oidOrObj"""
         data = self.raw(oidOrObj, True)
-        refs = self.BoundaryRefWalker().findRefs(data)
+        if data is not None:
+            refs = self.BoundaryRefWalker().findRefs(data['payload'])
+        else: refs = []
         return refs
 
     def copy(self, oidOrObj, bsTarget=None):
@@ -120,7 +122,7 @@ class BoundaryStoreReadMixin(object):
     #~ Utility: Entry read workhorses
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _hasEntry(self, entry, context=False, onError=None):
+    def _hasEntry(self, entry, context=False):
         ref = self.ws.contains(entry.oid)
         if not ref:
             return False
@@ -141,17 +143,15 @@ class BoundaryStoreReadMixin(object):
                     entry.setDeferred(typeref)
 
         except Exception, exc:
-            if onError is None:
-                onError = self._onReadError
-            if onError(entry, exc, rec['typeref']):
+            if entry.onHasEntryError(exc, rec['typeref']):
                 raise
-            return False
+            return False, None
 
         else:
             self._addDeferredRef(entry)
             return True
 
-    def _readEntry(self, entry, context=False, onError=None):
+    def _readEntry(self, entry, context=False):
         rec = self.ws.read(entry.oid)
         if rec is None:
             return False
@@ -180,11 +180,9 @@ class BoundaryStoreReadMixin(object):
                     self._onRead(rec, data, entry)
                     self.reg.add(entry)
         except Exception, exc:
-            if onError is None:
-                onError = self._onReadError
-            if onError(entry, exc, rec['typeref']):
+            if entry.onReadEntryError(exc, rec['typeref']):
                 raise
-            return False
+            return False, None
 
         return True
 

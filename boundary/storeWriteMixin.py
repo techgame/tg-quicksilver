@@ -32,19 +32,19 @@ class BoundaryStoreWriteMixin(object):
                 entry.dirty = dirty
         return entry
 
-    def add(self, obj, deferred=False, onError=None):
-        entry = self.setEntry(None, obj, deferred, onError)
+    def add(self, obj, deferred=False):
+        entry = self.setEntry(None, obj, deferred)
         return entry.oid
     append = add
 
-    def set(self, oid, obj, deferred=False, onError=None):
-        entry = self.setEntry(oid, obj, deferred, onError)
+    def set(self, oid, obj, deferred=False):
+        entry = self.setEntry(oid, obj, deferred)
         return entry.oid
 
     def __setitem__(self, oid, obj):
         self.setEntry(oid, obj)
 
-    def setEntry(self, oid, obj, deferred=False, onError=None):
+    def setEntry(self, oid, obj, deferred=False):
         entry = self.reg.lookup(obj)
         if entry is not None:
             oid = entry.oid
@@ -62,7 +62,7 @@ class BoundaryStoreWriteMixin(object):
             return entry
 
         entryColl = self._iterNewWriteEntries([entry])
-        self._writeEntryCollection(entryColl, False, onError)
+        self._writeEntryCollection(entryColl, False)
         return entry
 
     def addEntryCopy(self, fgnEntry):
@@ -77,12 +77,12 @@ class BoundaryStoreWriteMixin(object):
         self._deferredWriteEntries.append(entry)
         return entry
 
-    def write(self, oid, deferred=False, onError=None):
-        entry = self.writeEntry(oid, deferred, onError)
+    def write(self, oid, deferred=False):
+        entry = self.writeEntry(oid, deferred)
         if entry is not None:
             return entry.oid
 
-    def writeEntry(self, oid, deferred=False, onError=None):
+    def writeEntry(self, oid, deferred=False):
         entry = self.reg.lookup(oid)
         if entry is None:
             return None
@@ -92,7 +92,7 @@ class BoundaryStoreWriteMixin(object):
             return entry
 
         entryColl = self._iterNewWriteEntries([entry])
-        self._writeEntryCollection(entryColl, False, onError)
+        self._writeEntryCollection(entryColl, False)
         return entry
 
     def __delitem__(self, oidOrObj):
@@ -100,8 +100,13 @@ class BoundaryStoreWriteMixin(object):
 
     def delete(self, oidOrObj):
         entry = self.reg.lookup(oidOrObj)
-        self.reg.remove(entry.oid)
-        self.ws.remove(entry.oid)
+        if entry is None: 
+            return False
+        return self._deleteByOid(entry.oid)
+    def _deleteByOid(self, oid):
+        res = self.ws.remove(oid)
+        self.reg.remove(oid)
+        return res
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Workspace methods: commit, saveAll
@@ -111,17 +116,17 @@ class BoundaryStoreWriteMixin(object):
         """Increments groupId to mark sets of changes to support in-changeset rollback"""
         return self.ws.nextGroupId()
 
-    def saveAll(self, context=False, onError=None):
+    def saveAll(self, context=False):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
-        return self._writeEntryCollection(entryColl, context, onError)
+        return self._writeEntryCollection(entryColl, context)
 
-    def iterSaveAll(self, context=False, onError=None):
+    def iterSaveAll(self, context=False):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
-        return self._iterWriteEntryCollection(entryColl, context, onError)
+        return self._iterWriteEntryCollection(entryColl, context)
 
     def commit(self, **kw):
         """Commits changeset to quicksilver backend store"""
@@ -136,7 +141,7 @@ class BoundaryStoreWriteMixin(object):
             return entry.dirty
         else: return True 
 
-    def _writeEntry(self, entry, context=False, onError=None):
+    def _writeEntry(self, entry, context=False):
         if not entry.isActive():
             return False, None
         elif not self._checkWriteEntry(entry):
@@ -170,11 +175,11 @@ class BoundaryStoreWriteMixin(object):
                     ##    self.ws.postUpdate(seqId, hash=buffer(hash))
                     ##    entry.setHash(hash)
                     ##else: self.ws.postBackout(seqId)
-                pass
+
+                pass # note: exceptions while finishing ambit
+
         except Exception, exc:
-            if onError is None:
-                onError = self._onWriteError
-            if onError(entry, exc):
+            if entry.onWriteEntryError(exc):
                 raise
             return False, None
 
@@ -185,23 +190,19 @@ class BoundaryStoreWriteMixin(object):
     #~ Collection writing
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _writeEntryCollection(self, entryCollection, context=False, onError=None):
-        if onError is None:
-            onError = self._onWriteError
+    def _writeEntryCollection(self, entryCollection, context=False):
         writeEntry = self._writeEntry
         with self.ws.conn:
             for entries in entryCollection:
                 for entry in entries:
-                    writeEntry(entry, context, onError)
+                    writeEntry(entry, context)
 
-    def _iterWriteEntryCollection(self, entryCollection, context=False, onError=None):
-        if onError is None:
-            onError = self._onWriteError
+    def _iterWriteEntryCollection(self, entryCollection, context=False):
         writeEntry = self._writeEntry
         with self.ws.conn:
             for entries in entryCollection:
                 for entry in entries:
-                    r = writeEntry(entry, context, onError)
+                    r = writeEntry(entry, context)
                     if r is not None:
                         yield entry, r
 

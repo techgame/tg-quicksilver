@@ -83,10 +83,11 @@ class BoundaryEntry(NotStorableMixin):
         if hash is not False:
             self.setHash(hash)
 
+    GhostErrorTypes = (AttributeError, ImportError)
     def decodeFailure(self, err, sz_typeref):
         if not self.hasGhost(): return
 
-        if isinstance(err, AttributeError):
+        if isinstance(err, self.GhostErrorTypes):
             self.setDeferred(None)
             return True
 
@@ -119,6 +120,15 @@ class BoundaryEntry(NotStorableMixin):
     def proxyBoundary(self, bndV, bndCtx):
         return self.oid
 
+    #~ error processing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def onHasEntryError(self, exc, typeref):
+        return self.store()._onReadError(self, exc, typeref)
+    def onReadEntryError(self, exc, typeref):
+        return self.store()._onReadError(self, exc, typeref)
+    def onWriteEntryError(self, exc):
+        return self.store()._onWriteError(self, exc)
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getContext(self):
@@ -128,16 +138,19 @@ class BoundaryEntry(NotStorableMixin):
     def awakenObject(self, obj):
         return self._awakenObjectLoad(obj)
 
+    def _objSend(self, obj, msg, default=None):
+        fn = getattr(obj, msg, default)
+        if fn is not None: 
+            yield fn
+
     def _awakenObjectLoad(self, obj):
-        awaken = getattr(obj, '_awakenBoundary_', None)
-        if awaken is not None:
+        for awaken in self._objSend(obj, '_awakenBoundary_'):
             return awaken(self, self.store().context)
 
     def _awakenObjectCopy(self, obj):
         del self.awakenObject
 
-        awakenCopy = getattr(obj, '_awakenCopyBoundary_', None)
-        if awakenCopy is not None:
+        for awakenCopy in self._objSend(obj, '_awakenCopyBoundary_'):
             awakenCopy(self, self.store().context)
 
         return self._awakenObjectLoad(obj)
@@ -164,8 +177,7 @@ class BoundaryEntry(NotStorableMixin):
 
     def hibernate(self):
         obj = self.obj
-        updateBoundary = getattr(obj, '_updateBoundary_', None)
-        if updateBoundary is not None:
+        for updateBoundary in self._objSend(obj, '_updateBoundary_'):
             updateBoundary(self, self.store().context)
         return self.obj, self.getMeta()
 
@@ -189,6 +201,23 @@ class BoundaryEntry(NotStorableMixin):
         del self.ghostOid
     ghostObj = property(getGhostObj, setGhostObj, delGhostObj)
 
+    def substitueGhost(self, ghost=NotImplemented):
+        if ghost is NotImplemented:
+            ghost = self._ghost_obj
+            if ghost is not None:
+                # already have a ghost installed
+                return ghost
+            ghost = self.getGhostObj()
+
+        self._ghost_obj = ghost
+        self._typeref = ghost.__class__
+
+        if self.obj is not None:
+            # undo the active object
+            self.obj = None
+            self.setDeferred(self._typeref)
+        return ghost
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     _ghost_obj = None
@@ -209,10 +238,8 @@ class BoundaryEntry(NotStorableMixin):
         obj = self.obj
 
         if obj is None:
-            # unless there was a readFailure
-            obj = self.getGhostObj()
-            self._ghost_obj = obj
-            self._typeref = obj.__class__
+            # unless there was a decodeFailure
+            obj = self.substitueGhost()
         return obj
 
     def fetchProxyFn(self, name, args):
