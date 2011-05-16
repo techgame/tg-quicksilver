@@ -185,6 +185,7 @@ class Workspace(WorkspaceBase):
 
     def clearChangeLog(self):
         ex = self.cur.execute; ns = self.ns
+        ex("delete from %(ws_version)s where revId is NULL;" % ns)
         ex("update %(ws_version)s set seqId=null,flags=?;" % ns, 
                 (self._flags.clear,))
         ex("delete from %(ws_log)s;" % ns)
@@ -223,7 +224,7 @@ class Workspace(WorkspaceBase):
         return [e[0] for e in res]
 
     def contains(self, oid):
-        q = "select oid, revId, seqId from %(ws_version)s where oid=? limit 1;" % self.ns
+        q = "select oid, revId, seqId from %(ws_version)s where oid=? and revId not NULL limit 1;" % self.ns
         r = self.conn.execute(q, (oid,))
         r = r.fetchone()
         if r is not None: 
@@ -271,7 +272,8 @@ class Workspace(WorkspaceBase):
     def remove(self, oid):
         if oid is None:
             return False
-
+        if not self.contains(oid):
+            return False
         op = Ops.Remove(self)
         return op.perform(oid)
 

@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from ..mixins import NotStorableMixin
 from .storeReadMixin import BoundaryStoreReadMixin
 from .storeWriteMixin import BoundaryStoreWriteMixin
+from .storeGCMixin import BoundaryStoreGCMixin
 from . import storeEntry, oidRegistry, strategy
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -173,6 +174,7 @@ class BoundaryStoreEncodingMixin(object):
 class BoundaryStore(
         BoundaryStoreReadMixin, 
         BoundaryStoreWriteMixin,
+        BoundaryStoreGCMixin,
         BoundaryStoreEncodingMixin, 
         BoundaryStoreBase, ):
 
