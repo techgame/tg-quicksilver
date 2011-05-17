@@ -177,8 +177,10 @@ class RootProxyRef(RootProxy):
     def __repr__(self):
         entry = object.__getattribute__(self, '_obj_')
         typeref = entry.typeref()
-        return '<%s.%s {proxy oid:%s}>' % (
-            typeref.__module__, typeref.__name__, entry.oid, )
+        if typeref is not None:
+            return '<%s.%s {proxy oid:%s}>' % (
+                typeref.__module__, typeref.__name__, entry.oid,)
+        else: return '<?.? {proxy oid: %s}>' % (entry.oid,)
 
     def __getattribute__(self, name):
         entry = object.__getattribute__(self, '_obj_')
