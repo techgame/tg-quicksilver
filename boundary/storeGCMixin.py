@@ -9,9 +9,9 @@
 class BoundaryStoreGCMixin(object):
     def garbageCollect(self, greylist=None):
         white, black = self.gcWalk(greylist)
-        print 'white:', len(white), 'black:', len(black)
+        print 'GC white:', len(white), 'black:', len(black)
         for oid in white:
-            print '  gc oid:', oid, self.get(oid, None)
+            #print '  gc oid:', oid, self.get(oid, None)
             self._deleteByOid(oid)
         return white
     gc = garbageCollect

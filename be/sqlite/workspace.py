@@ -10,6 +10,8 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+import sys
+import contextlib
 import sqlite3
 
 from ..base.errors import WorkspaceError
@@ -166,7 +168,7 @@ class Workspace(WorkspaceBase):
         nLog = self._publishChangeLog(ex, ns)
         nPtrs = self._publishChangeVersions(ex, ns)
         if nPtrs != nLog:
-            raise RuntimeError("Changes to revision log (%s) did not equal the changes to the version table(%s) " % (nLog, nPtrs))
+            print >> sys.stderr, RuntimeError("Changes to revision log (%s) did not equal the changes to the version table(%s) " % (nLog, nPtrs))
         return nLog
 
     def _publishChangeLog(self, ex, ns):
@@ -196,8 +198,10 @@ class Workspace(WorkspaceBase):
         if r is not None:
             return r[0]
 
-    def _dbCommit(self):
-        self.conn.commit()
+    @contextlib.contextmanager
+    def inCommit(self):
+        with self.conn:
+            yield 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ OID data operations

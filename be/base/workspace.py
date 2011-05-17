@@ -11,6 +11,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 import os
+import contextlib
 from .errors import WorkspaceError
 from ...mixins import NotStorableMixin
 
@@ -105,14 +106,15 @@ class WorkspaceBase(NotStorableMixin):
         ns = self.ns
 
         if kw: cs.update(kw)
-        self.publishChanges()
-        self.clearChangeLog()
-        cs.closeChangeset()
-        self.csWorking = None
-        self.csCheckout = cs
-        self._updateCurrentChangeset(cs)
 
-        self._dbCommit()
+        with self.inCommit():
+            self.publishChanges()
+            self.clearChangeLog()
+            cs.closeChangeset()
+            self.csWorking = None
+            self.csCheckout = cs
+            self._updateCurrentChangeset(cs)
+
         return True
 
     def revertAll(self):
@@ -147,7 +149,9 @@ class WorkspaceBase(NotStorableMixin):
 
     def _updateCurrentChangeset(self, cs):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def _dbCommit(self):
+
+    @contextlib.contextmanager
+    def inCommit(self):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     def getDBName(self):
