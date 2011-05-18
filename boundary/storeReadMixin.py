@@ -31,22 +31,41 @@ class BoundaryStoreReadMixin(object):
         if entry is not None:
             return entry.oid
 
-    def ref(self, oid):
-        """Returns a deferred proxied to the object stored at oid"""
+    def refEntry(self, oid):
+        """Returns an entry for the object stored at oid"""
         entry = self.reg.lookup(oid)
-
         if entry is not None:
             if entry.obj is None:
                 self._addDeferredRef(entry)
-            return entry.pxy
+            return entry
 
         entry = self.BoundaryEntry(oid)
         if self._hasEntry(entry):
-            return entry.pxy
+            return entry
         else: return None
+
+    def ref(self, oid):
+        """Returns a deferred proxied to the object stored at oid"""
+        entry = self.refEntry(oid)
+        if entry is None:
+            return None
+        return entry.pxy
 
     def __getitem__(self, oid):
         return self.get(oid)
+
+    def iterAllEntries(self):
+        for oid in self.allOids():
+            entry = self.refEntry(oid)
+            if entry is not None:
+                yield entry
+
+    def iterAllObjects(self):
+        sentinal = object()
+        for oid in self.allOids():
+            obj = self.get(oid, sentinal)
+            if obj is not sentinal:
+                yield obj
 
     def get(self, oid, default=NotImplemented):
         """Returns a transparent proxied to object stored at oid"""
