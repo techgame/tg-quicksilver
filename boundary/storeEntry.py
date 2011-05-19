@@ -145,13 +145,13 @@ class BoundaryEntry(NotStorableMixin):
 
     def _awakenObjectLoad(self, obj):
         for awaken in self._objSend(obj, '_awakenBoundary_'):
-            return awaken(self, self.store().context)
+            return awaken(self, self.context)
 
     def _awakenObjectCopy(self, obj):
         del self.awakenObject
 
         for awakenCopy in self._objSend(obj, '_awakenCopyBoundary_'):
-            awakenCopy(self, self.store().context)
+            awakenCopy(self, self.context)
 
         return self._awakenObjectLoad(obj)
 
@@ -178,7 +178,7 @@ class BoundaryEntry(NotStorableMixin):
     def hibernate(self):
         obj = self.obj
         for updateBoundary in self._objSend(obj, '_updateBoundary_'):
-            updateBoundary(self, self.store().context)
+            updateBoundary(self, self.context)
         return self.obj, self.getMeta()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

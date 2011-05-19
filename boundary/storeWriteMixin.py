@@ -62,7 +62,7 @@ class BoundaryStoreWriteMixin(object):
             return entry
 
         entryColl = self._iterNewWriteEntries([entry])
-        self._writeEntryCollection(entryColl, False)
+        self._writeEntryCollection(entryColl)
         return entry
 
     def addEntryCopy(self, fgnEntry):
@@ -92,7 +92,7 @@ class BoundaryStoreWriteMixin(object):
             return entry
 
         entryColl = self._iterNewWriteEntries([entry])
-        self._writeEntryCollection(entryColl, False)
+        self._writeEntryCollection(entryColl)
         return entry
 
     def __delitem__(self, oidOrObj):
@@ -116,17 +116,17 @@ class BoundaryStoreWriteMixin(object):
         """Increments groupId to mark sets of changes to support in-changeset rollback"""
         return self.ws.nextGroupId()
 
-    def saveAll(self, context=False):
+    def saveAll(self):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
-        return self._writeEntryCollection(entryColl, context)
+        return self._writeEntryCollection(entryColl)
 
-    def iterSaveAll(self, context=False):
+    def iterSaveAll(self):
         """Saves all entries loaded.  
         See also: saveDirtyOnly to controls behavior"""
         entryColl = self._iterNewWriteEntries(self.reg.allLoadedEntries())
-        return self._iterWriteEntryCollection(entryColl, context)
+        return self._iterWriteEntryCollection(entryColl)
 
     def commit(self, **kw):
         """Commits changeset to quicksilver backend store"""
@@ -141,7 +141,7 @@ class BoundaryStoreWriteMixin(object):
             return entry.dirty
         else: return True 
 
-    def _writeEntry(self, entry, context=False):
+    def _writeEntry(self, entry):
         if not entry.isActive():
             return False, None
         elif not self._checkWriteEntry(entry):
@@ -150,7 +150,7 @@ class BoundaryStoreWriteMixin(object):
         try:
             obj, entryMeta = entry.hibernate()
 
-            with self.ambit(entry, context) as ambit:
+            with self.ambit(entry) as ambit:
                 self.reg.add(entry)
                 data = ambit.dump(obj)
                 # TODO: delegate expensive hashing
@@ -190,19 +190,19 @@ class BoundaryStoreWriteMixin(object):
     #~ Collection writing
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _writeEntryCollection(self, entryCollection, context=False):
+    def _writeEntryCollection(self, entryCollection):
         writeEntry = self._writeEntry
         with self.ws.conn:
             for entries in entryCollection:
                 for entry in entries:
-                    writeEntry(entry, context)
+                    writeEntry(entry)
 
-    def _iterWriteEntryCollection(self, entryCollection, context=False):
+    def _iterWriteEntryCollection(self, entryCollection):
         writeEntry = self._writeEntry
         with self.ws.conn:
             for entries in entryCollection:
                 for entry in entries:
-                    r = writeEntry(entry, context)
+                    r = writeEntry(entry)
                     if r is not None:
                         yield entry, r
 

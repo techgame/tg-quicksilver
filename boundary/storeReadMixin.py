@@ -141,7 +141,7 @@ class BoundaryStoreReadMixin(object):
     #~ Utility: Entry read workhorses
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def _hasEntry(self, entry, context=False):
+    def _hasEntry(self, entry):
         ref = self.ws.contains(entry.oid)
         if not ref:
             return False
@@ -150,7 +150,7 @@ class BoundaryStoreReadMixin(object):
         entry.setMeta(rec['entryMeta'])
 
         try:
-            with self.ambit(entry, context) as ambit:
+            with self.ambit(entry) as ambit:
                 self.reg.add(entry)
                 try:
                     typeref = ambit.decodeTyperef(rec['typeref'])
@@ -170,7 +170,7 @@ class BoundaryStoreReadMixin(object):
             self._addDeferredRef(entry)
             return True
 
-    def _readEntry(self, entry, context=False):
+    def _readEntry(self, entry):
         rec = self.ws.read(entry.oid)
         if rec is None:
             return False
@@ -181,7 +181,7 @@ class BoundaryStoreReadMixin(object):
             return False
 
         try:
-            with self.ambit(entry, context) as ambit:
+            with self.ambit(entry) as ambit:
                 self.reg.add(entry)
                 data = self._decodeData(data)
                 try:
