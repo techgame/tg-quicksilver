@@ -75,9 +75,6 @@ class Workspace(WorkspaceBase):
         schema = self.Schema(self.ns, self)
         schema.initStore(self.conn)
 
-    def _initSchema(self):
-        schema = self.Schema(self.ns, self)
-
     def _initStoredCS(self):
         cs = self.readCurrentChangeset()
         if cs is None:
