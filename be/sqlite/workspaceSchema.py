@@ -31,10 +31,11 @@ class WorkspaceSchema(object):
         else: ns.temp = '' 
 
         if ns.wsid:
-            csName = '%(name)s_%(wsid)s' % ns
-        else: csName = '%(name)s' % ns
+            wsName = '%(name)s_%(wsid)s' % ns
+        else: wsName = '%(name)s' % ns
+        ns.wsName = wsName
         for k in self.sqlObjects:
-            ns[k] = '%s_%s' % (csName, k)
+            ns[k] = '%s_%s' % (wsName, k)
 
     def initStore(self, conn):
         with conn:

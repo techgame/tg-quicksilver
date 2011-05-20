@@ -150,6 +150,15 @@ class ChangeLogOpBase(ChangeOpBase):
 #~ Workhorse ChangeOps
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+class Touch(ChangeOpBase):
+    def perform(self, oid):
+        if oid is None:
+            raise ValueError("OID cannot be None")
+        self.oid = oid
+        self.revId = int(self.csWorking)
+        seqId = self.addLogEntry([], [])
+        return seqId
+
 class Write(ChangeOpBase):
     def perform(self, oid, dataItems):
         if oid is None:

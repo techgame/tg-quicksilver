@@ -110,6 +110,16 @@ class BoundaryEntry(NotStorableMixin):
         self.hash = hash
         self.dirty = not hash
 
+    def revId(self):
+        return self.store().findRevId(self.oid)
+    def nextRevId(self):
+        return self.store().nextRevId(self.oid)
+
+    def externId(self):
+        return self.oid, self.revId()
+    def nextExternId(self):
+        return self.oid, self.nextRevId()
+
     _typeref = False
     def typeref(self):
         obj = self.obj

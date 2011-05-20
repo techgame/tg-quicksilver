@@ -75,6 +75,9 @@ class Workspace(WorkspaceBase):
         schema = self.Schema(self.ns, self)
         schema.initStore(self.conn)
 
+    def _initSchema(self):
+        schema = self.Schema(self.ns, self)
+
     def _initStoredCS(self):
         cs = self.readCurrentChangeset()
         if cs is None:
@@ -138,7 +141,9 @@ class Workspace(WorkspaceBase):
              '  select * from %(qs_version)s where versionId=?;') % ns
 
         r = ex(q, list(versions))
-        return r.rowcount
+        rowcount = r.rowcount
+        self.clearRemoved()
+        return rowcount
 
     def markCheckout(self):
         self.checkCommited()
@@ -185,9 +190,13 @@ class Workspace(WorkspaceBase):
         r = ex(q%ns, (self._flags.changed,))
         return r.rowcount
 
+    def clearRemoved(self):
+        ex = self.cur.execute; ns = self.ns
+        r = ex("delete from %(ws_version)s where revId is NULL;" % ns)
+        return r.rowcount
     def clearChangeLog(self):
         ex = self.cur.execute; ns = self.ns
-        ex("delete from %(ws_version)s where revId is NULL;" % ns)
+        self.clearRemoved()
         ex("update %(ws_version)s set seqId=null,flags=?;" % ns, 
                 (self._flags.clear,))
         ex("delete from %(ws_log)s;" % ns)
@@ -234,6 +243,17 @@ class Workspace(WorkspaceBase):
         if r is not None: 
             return tuple(r)
         else: return False
+
+    def revId(self, oid):
+        q = "select revId from %(ws_version)s where oid=?;" % self.ns
+        r = self.conn.execute(q, (oid,)).fetchone()
+        if r is not None: 
+            return r[0]
+
+    def nextRevId(self, oid):
+        op = Ops.Touch(self)
+        op.perform(oid)
+        return op.revId
 
     def read(self, oid, cols=False):
         ex = self.conn.execute; ns = self.ns
@@ -287,6 +307,39 @@ class Workspace(WorkspaceBase):
     def postBackout(self, seqId):
         op = Ops.Backout(self)
         return op.perform(seqId)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def createExternTable(self, tableName, columns, primaryKey=None, index=True):
+        body = ['  %s %s' % (col_name, col_definition) for col_name, col_definition in columns]
+        if primaryKey is not None:
+            if isinstance(primaryKey, tuple):
+                primaryKey, conflict = primaryKey
+            else: conflict = 'REPLACE'
+
+            body.append('  (oid, revId, %s) PRIMARY KEY on conflict %s' % (primaryKey, conflict))
+
+        q = """create table if not exists %s (
+                    oid INTEGER not null,
+                    revId INTEGER, \n%s)""" % (tableName, ',\n'.join(body))
+        self.cur.execute(q)
+        if index:
+            # create an index for (oid, revId) so that lookup filtering is fast
+            q = """create index if not exists %s_wsindex 
+                    on %s (oid, revid);""" % (tableName, tableName)
+            self.cur.execute(q)
+        return tableName
+
+    def createExternWSView(self, tableName):
+        ns = self.ns.copy()
+        ns.qs_extern = tableName
+        ns.ws_extern = '%s_ws_%s' % (self.ns.wsName, ns.qs_extern)
+        q = """create %(temp)s view if not exists %(ws_extern)s as 
+                select * from %(qs_extern)s
+                    inner join %(ws_version)s
+                        using (oid, revId);""" % ns
+        self.cur.execute(q)
+        return ns.ws_extern
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

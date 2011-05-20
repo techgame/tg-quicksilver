@@ -101,6 +101,11 @@ class BoundaryStoreReadMixin(object):
             self._onReadRaw(rec, None)
         return rec
 
+    def findRevId(self, oid):
+        return self.ws.revId(oid)
+    def nextRevId(self, oid):
+        return self.ws.nextRevId(oid)
+
     def findRefsFrom(self, oidOrObj):
         """Returns a set of oids referenced by oidOrObj"""
         data = self.raw(oidOrObj, True)
