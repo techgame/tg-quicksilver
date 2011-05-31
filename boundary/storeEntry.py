@@ -31,6 +31,8 @@ class _AnExampleEntryObject_(object):
         "to set state on a copy operation.  Called before awakenBoundary"
     def _updateBoundary_(self, bndEntry, bndCtx):
         "to prepare object for hibernation"
+    def _dataChangedBoundary_(self, bndEntry, bndCtx):
+        "to notify the object that it's data changed compared to what is stored in db"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -190,6 +192,11 @@ class BoundaryEntry(NotStorableMixin):
         for updateBoundary in self._objSend(obj, '_updateBoundary_'):
             updateBoundary(self, self.context)
         return self.obj, self.getMeta()
+
+    def dataChanged(self):
+        obj = self.obj
+        for dataChanged in self._objSend(obj, '_dataChangedBoundary_'):
+            dataChanged(self, self.context)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

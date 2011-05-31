@@ -112,6 +112,9 @@ class BoundaryStoreWriteMixin(object):
     #~ Workspace methods: commit, saveAll
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def nextRevId(self, oid):
+        return self.ws.nextRevId(oid)
+
     def nextGroupId(self):
         """Increments groupId to mark sets of changes to support in-changeset rollback"""
         return self.ws.nextGroupId()
@@ -158,6 +161,7 @@ class BoundaryStoreWriteMixin(object):
                 changed = (entry.hash != hash)
 
                 if changed:
+                    entry.dataChanged()
                     payload = self._encodeData(data)
                     self._onWrite(payload, data, entry)
 
