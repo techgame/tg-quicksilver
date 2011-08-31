@@ -316,26 +316,32 @@ class Workspace(WorkspaceBase):
 
             body.append('  (oid, revId, %s) PRIMARY KEY on conflict %s' % (primaryKey, conflict))
 
-        q = """create table if not exists %s (
-                    oid INTEGER not null,
-                    revId INTEGER, \n%s)""" % (tableName, ',\n'.join(body))
-        self.cur.execute(q)
-        if index:
-            # create an index for (oid, revId) so that lookup filtering is fast
-            q = """create index if not exists %s_wsindex 
-                    on %s (oid, revid);""" % (tableName, tableName)
+        meta = self.metadataView()
+        with self.conn:
+            q = """create table if not exists %s (
+                        oid INTEGER not null,
+                        revId INTEGER, \n%s)""" % (tableName, ',\n'.join(body))
             self.cur.execute(q)
+            meta.setAt("extern:sql-tables", tableName, q)
+
+            if index:
+                # create an index for (oid, revId) so that lookup filtering is fast
+                indexName = tableName + "_wsindex"
+                q = """create index if not exists %s on %s (oid, revid);""" % (indexName, tableName)
+                self.cur.execute(q)
+                meta.setAt("extern:sql-indexes", indexName, q)
         return tableName
 
     def createExternWSView(self, tableName):
         ns = self.ns.copy()
         ns.qs_extern = tableName
         ns.ws_extern = '%s_ws_%s' % (self.ns.wsName, ns.qs_extern)
-        q = """create %(temp)s view if not exists %(ws_extern)s as 
-                select * from %(qs_extern)s
-                    inner join %(ws_version)s
-                        using (oid, revId);""" % ns
-        self.cur.execute(q)
+        with self.conn:
+            q = """create %(temp)s view if not exists %(ws_extern)s as 
+                    select * from %(qs_extern)s
+                        inner join %(ws_version)s
+                            using (oid, revId);""" % ns
+            self.cur.execute(q)
         return ns.ws_extern
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

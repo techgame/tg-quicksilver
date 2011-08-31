@@ -17,9 +17,11 @@ from ..base.metadata import MetadataViewBase
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class MetadataView(MetadataViewBase):
-    def __init__(self, host):
+    def __init__(self, host, **kw):
         self.cur = host.cur
         self.ns = host.ns
+        if kw: 
+            self.ns = self.ns.branch(kw)
 
     def getAt(self, name, idx=None, default=None):
         if idx is None: 
@@ -56,8 +58,8 @@ class MetadataView(MetadataViewBase):
         r = self.cur.execute(stmt+where, (name,))
         return r
 
-def metadataView(host, key=None):
-    view = MetadataView(host)
+def metadataView(host, key=None, **kw):
+    view = MetadataView(host, **kw)
     if key is not None:
         view = view.keyView(key)
     return view
