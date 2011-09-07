@@ -199,11 +199,13 @@ class VersionSchema(object):
                 except sqlite3.OperationalError: 
                     pass
 
+        with conn:
             # recreate and copy the more dynamic extern tables
             srcMeta = self.metadataView(qs_meta='%(db_branch)s.%(qs_meta)s'%self.ns)
             tables = [(k, conn.execute(q))[0] for k,q in srcMeta.iter('extern:sql-tables')]
             indexes = [(k, conn.execute(q))[0] for k,q in srcMeta.iter('extern:sql-indexes')]
 
+        with conn:
             for k in tables:
                 try: conn.execute('insert or replace into %s select * from %s.%s' % (k,dbName,k))
                 except sqlite3.OperationalError:
