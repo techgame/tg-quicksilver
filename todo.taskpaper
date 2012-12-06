@@ -3,8 +3,8 @@ Boundry Store:
 
 Pickle Tools:
 - Reference walker, allowing us to do garbage collection over a workspace @done
-- Dot visualizers
-    - for individual stores
-    - for boundary references as a whole
+- Dot visualizers @done
+    - for individual stores @done
+    - for boundary references as a whole @done
 - Pickle to JSON translator (and back)
 
