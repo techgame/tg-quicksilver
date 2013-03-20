@@ -57,13 +57,13 @@ class FlatWorkspace(WorkspaceBasic):
     def nextGroupId(self, grpId=False): return None
 
     def allOids(self):
-        return itertools.chain(self._db_w.entries.iterkeys(),
-                self._db.entries.iterkeys())
+        return itertools.chain(self._entries_w.iterkeys(),
+                self._entries.iterkeys())
     def contains(self, oid):
-        return (oid in self._db.entries or oid in self._db_w.entries)
+        return (oid in self._entries or oid in self._entries_w)
     def read(self, oid, cols=False):
-        ans = self._db.entries.get(oid)
-        return self._db_w.entries.get(oid, ans)
+        ans = self._entries.get(oid)
+        return self._entries_w.get(oid, ans)
 
     def commit(self, **kw):
         self.metadataView().commit()
@@ -71,17 +71,17 @@ class FlatWorkspace(WorkspaceBasic):
         self._entries_w.clear()
 
     def write(self, oid, **data):
-        entry = self._db.entries.pop(oid, {})
+        entry = self._entries.pop(oid, {})
         entry.update(data)
-        self._db_w.entries[oid] = entry
+        self._entries_w[oid] = entry
     def postUpdate(self, seqId, **data):
         raise NotImplementedError('Not supported')
     def postBackout(self, seqId):
         raise NotImplementedError('Not supported')
 
     def remove(self, oid):
-        ans = self._db.entries.pop(oid, None)
-        self._db_w.entries.pop(oid, ans)
+        ans = self._entries.pop(oid, None)
+        self._entries_w.pop(oid, ans)
         return ans
 
     def createExternTable(self, *args, **kw):

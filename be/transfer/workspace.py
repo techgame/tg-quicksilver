@@ -48,6 +48,8 @@ class TransferWorkspace(WorkspaceBasic):
     #~ OID data operations
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def newOid(self):
+        return self._ws_dst.newOid()
     def revId(self, oid):
         return self._ws_dst.revId(oid)
     def nextRevId(self, oid):
@@ -61,6 +63,11 @@ class TransferWorkspace(WorkspaceBasic):
         return self._ws_src.contains(oid)
     def read(self, oid, cols=False):
         return self._ws_src.read(oid, cols)
+
+    def inCommit(self):
+        return self._ws_dst.inCommit()
+    def commit(self, **kw):
+        return self._ws_dst.commit(**kw)
 
     def write(self, oid, **data):
         return self._ws_dst.write(oid, **data)
