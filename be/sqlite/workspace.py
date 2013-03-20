@@ -31,7 +31,7 @@ class WorkspaceFlags(object):
     marked = 1
     changed = 4
 
-class Workspace(WorkspaceCSBase):
+class SQLiteWorkspace(WorkspaceCSBase):
     Schema = workspaceSchema.WorkspaceSchema
     metadataView = metadata.metadataView
     temporary = False
@@ -347,7 +347,8 @@ class Workspace(WorkspaceCSBase):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def workspaceView(host, wsid=None):
-    return Workspace(host, wsid)
+    return SQLiteWorkspace(host, wsid)
+Workspace = SQLiteWorkspace
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Register adaptors
