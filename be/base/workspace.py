@@ -19,7 +19,49 @@ from ...mixins import NotStorableMixin
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class WorkspaceBase(NotStorableMixin):
+class WorkspaceBasic(NotStorableMixin):
+    def isMutable(self): return True
+
+    @contextlib.contextmanager
+    def inCommit(self): yield
+    def commit(self, **kw):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+    def getDBName(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    dbname = property(lambda self: self.getDBName())
+    def getDBPath(self):
+        return os.path.dirname(self.getDBName())
+    dbpath = property(getDBPath)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ OID data operations
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def nextGroupId(self, grpId=False):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def newOid(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+    def allOids(self):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def contains(self, oid):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def read(self, oid, cols=False):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def write(self, oid, **data):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def remove(self, oid):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+    def postUpdate(self, seqId, **data):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+    def postBackout(self, seqId):
+        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class WorkspaceCSBase(WorkspaceBasic):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ Checkout and Working Changesets
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -30,9 +72,6 @@ class WorkspaceBase(NotStorableMixin):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     csCheckout = None
-
-    def isMutable(self):
-        return True
 
     _csWorking = None
     def getCSWorking(self, create=True):
@@ -148,41 +187,5 @@ class WorkspaceBase(NotStorableMixin):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     def _updateCurrentChangeset(self, cs):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-
-    @contextlib.contextmanager
-    def inCommit(self):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-
-    def getDBName(self):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    dbname = property(lambda self: self.getDBName())
-    def getDBPath(self):
-        return os.path.dirname(self.getDBName())
-    dbpath = property(getDBPath)
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    #~ OID data operations
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def nextGroupId(self, grpId=False):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def newOid(self):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-
-    def allOids(self):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def contains(self, oid):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def read(self, oid, asNS=True):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def write(self, oid, **data):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def remove(self, oid):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-
-    def postUpdate(self, seqId, **data):
-        raise NotImplementedError('Subclass Responsibility: %r' % (self,))
-    def postBackout(self, seqId):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 

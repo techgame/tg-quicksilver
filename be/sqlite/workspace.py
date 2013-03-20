@@ -15,7 +15,7 @@ import contextlib
 import sqlite3
 
 from ..base.errors import WorkspaceError
-from ..base.workspace import WorkspaceBase
+from ..base.workspace import WorkspaceCSBase
 from . import metadata
 from . import workspaceSchema
 from .changeset import Changeset
@@ -31,7 +31,7 @@ class WorkspaceFlags(object):
     marked = 1
     changed = 4
 
-class Workspace(WorkspaceBase):
+class Workspace(WorkspaceCSBase):
     Schema = workspaceSchema.WorkspaceSchema
     metadataView = metadata.metadataView
     temporary = False

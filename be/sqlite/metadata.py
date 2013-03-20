@@ -52,10 +52,14 @@ class MetadataView(MetadataViewBase):
             return ex(stmt, (name, idx))
         else: return ex(stmt, (name,))
 
-    def iter(self, name):
-        stmt  = "select idx, value from %(qs_meta)s \n" % self.ns
-        where = "  where name=? order by idx"
-        r = self.cur.execute(stmt+where, (name,))
+    def iter(self, name=None):
+        if name is not None:
+            stmt  = "select idx, value from %(qs_meta)s \n" % self.ns
+            where = "  where name=? order by idx"
+            r = self.cur.execute(stmt+where, (name,))
+        else:
+            stmt = "select name, idx, value from %(qs_meta)s" % self.ns
+            r = [((n,i),v) for n,i,v in self.cur.execute(stmt)]
         return r
 
 def metadataView(host, key=None, **kw):
