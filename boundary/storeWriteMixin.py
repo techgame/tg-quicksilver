@@ -196,14 +196,14 @@ class BoundaryStoreWriteMixin(object):
 
     def _writeEntryCollection(self, entryCollection):
         writeEntry = self._writeEntry
-        with self.ws.conn:
+        with self.ws.inCommit():
             for entries in entryCollection:
                 for entry in entries:
                     writeEntry(entry)
 
     def _iterWriteEntryCollection(self, entryCollection):
         writeEntry = self._writeEntry
-        with self.ws.conn:
+        with self.ws.inCommit():
             for entries in entryCollection:
                 for entry in entries:
                     r = writeEntry(entry)
