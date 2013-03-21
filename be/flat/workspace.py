@@ -60,8 +60,11 @@ class FlatWorkspace(WorkspaceBasic):
         return itertools.chain(self._entries_w.iterkeys(),
                 self._entries.iterkeys())
     def contains(self, oid):
-        return (oid in self._entries or oid in self._entries_w)
+        if oid in self._entries or oid in self._entries_w:
+            return oid
+        return False
     def read(self, oid, cols=False):
+        if isinstance(oid, tuple): oid = oid[0]
         ans = self._entries.get(oid)
         return self._entries_w.get(oid, ans)
 
