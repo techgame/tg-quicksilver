@@ -28,6 +28,8 @@ _fastOutTypes_ = (
     bool, int, long, float, complex,
     tuple, list, set, dict, )
 
+_oidTypes_ = (int, long, basestring)
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
@@ -48,8 +50,8 @@ class BasicBoundaryStrategy(ambit.IBoundaryStrategy):
     def objForReservedId(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
-    def objForRef(self, ref):
-        if isinstance(ref, (int,long)):
+    def objForRef(self, ref, _oidTypes_=_oidTypes_):
+        if isinstance(ref, _oidTypes_):
             if ref <= 0:
                 return self.objForReservedId(ref)
             else:
