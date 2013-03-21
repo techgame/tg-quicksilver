@@ -33,7 +33,11 @@ class TransferWorkspace(WorkspaceBasic):
         src = self._ws_src; dst = self._ws_dst
         self.metadataView().migrate()
         for oid in src.allOids():
-            dst.write(oid, **src.read(oid))
+            self._migrateEntry(oid, src, dst)
+    def _migrateEntry(self, oid, src, dst):
+        data = dict(src.read(oid))
+        data.pop('oid', None)
+        dst.write(oid, **data)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

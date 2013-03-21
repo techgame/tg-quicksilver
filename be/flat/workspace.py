@@ -27,19 +27,19 @@ class MonotonicOids(MonotonicUniqueId):
 class FlatWorkspace(WorkspaceBasic):
     metadataView = metadata.metadataView
 
-    def __init__(self, dbFilename, db=None, db_w=None):
+    def __init__(self, dbFilename, *args, **kw):
         self.newOid = MonotonicOids().next
         self._dbname = os.path.abspath(dbFilename)
-        self.initDB(db, db_w)
+        self._db, self._db_w = self.initDB(*args, **kw)
+        self._initEntries()
 
     def initDB(self, db=None, db_w=None):
         if db is None: db = {}
-        self._db = db
-        self._entries = db.setdefault('entries', {})
-
         if db_w is None: db_w = {}
-        self._db_w = db_w
-        self._entries_w = db_w.setdefault('entries', {})
+        return db, db_w
+    def _initEntries(self):
+        self._entries = self._db.setdefault('entries', {})
+        self._entries_w = self._db_w.setdefault('entries', {})
 
     def __repr__(self):
         K = self.__class__
@@ -66,9 +66,10 @@ class FlatWorkspace(WorkspaceBasic):
         return self._entries_w.get(oid, ans)
 
     def commit(self, **kw):
-        self.metadataView().commit()
+        self.metadataView().commit(**kw)
         self._entries.update(self._entries_w)
-        self._entries_w.clear()
+        if kw.get('clear', True):
+            self._entries_w.clear()
 
     def write(self, oid, **data):
         entry = self._entries.pop(oid, {})
