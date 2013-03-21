@@ -10,5 +10,6 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+from .workspace import Workspace, SQLiteWorkspace, workspaceView
 from .versions import Versions
 
