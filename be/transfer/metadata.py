@@ -16,7 +16,7 @@ from ..base.metadata import MetadataViewBase
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class MetadataView(MetadataViewBase):
+class TransferMetadataView(MetadataViewBase):
     def __init__(self, host):
         self._meta_src = host._ws_src.metadataView()
         self._meta_dst = host._ws_dst.metadataView()
@@ -37,9 +37,7 @@ class MetadataView(MetadataViewBase):
     def iter(self, name=None):
         return self._meta_src.iter(name)
 
+MetadataView = TransferMetadataView
 def metadataView(host, key=None, **kw):
-    view = MetadataView(host, **kw)
-    if key is not None:
-        view = view.keyView(key)
-    return view
+    return TransferMetadataView(host, **kw).keyView(key)
 

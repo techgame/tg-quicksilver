@@ -43,7 +43,8 @@ class MetadataViewBase(object):
     def iter(self, name):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
-    def keyView(self, metaKey):
+    def keyView(self, metaKey=None):
+        if metaKey is None: return self
         return KeyedMetadataView(self, metaKey)
     def __getitem__(self, metaKey):
         return self.keyView(metaKey)

@@ -16,7 +16,7 @@ from ..base.metadata import MetadataViewBase
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class MetadataView(MetadataViewBase):
+class SQLiteMetadataView(MetadataViewBase):
     def __init__(self, host, **kw):
         self.cur = host.cur
         self.ns = host.ns
@@ -62,9 +62,7 @@ class MetadataView(MetadataViewBase):
             r = [((n,i),v) for n,i,v in self.cur.execute(stmt)]
         return r
 
+MetadataView = SQLiteMetadataView
 def metadataView(host, key=None, **kw):
-    view = MetadataView(host, **kw)
-    if key is not None:
-        view = view.keyView(key)
-    return view
+    return SQLiteMetadataView(host, **kw).keyView(key)
 

@@ -17,14 +17,15 @@ from ..base.metadata import MetadataViewBase
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class MetadataView(MetadataViewBase):
+class FlatMetadataView(MetadataViewBase):
     def __init__(self, host):
         self._meta = host._db.setdefault('meta', {})
         self._meta_w = host._db_w.setdefault('meta', {})
 
     def commit(self, **kw):
         self._meta.update(self._meta_w)
-        self._meta_w.clear()
+        if kw.get('clear', True):
+            self._meta_w.clear()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -49,9 +50,7 @@ class MetadataView(MetadataViewBase):
         byName = lambda (meta): ((i,e) for (n,i),e in meta.iteritems() if n == name)
         return itertools.chain(byName(self._meta), byName(self._meta_w))
 
+MetadataView = FlatMetadataView
 def metadataView(host, key=None, **kw):
-    view = MetadataView(host, **kw)
-    if key is not None:
-        view = view.keyView(key)
-    return view
+    return FlatMetadataView(host, **kw).keyView(key)
 
