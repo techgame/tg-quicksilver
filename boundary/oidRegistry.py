@@ -34,7 +34,12 @@ class BoundaryOidRegistry(object):
 
     def clear(self):
         self.db_oid = {}
-        self.db_ident = {}
+        self.db_ident = db_ident = {}
+        self.db_refs = db_refs = []
+        def _addOidsFor(oid, a, b):
+            if a is not None: db_ident[id(a)]=oid; db_refs.append(a)
+            if b is not None: db_ident[id(b)]=oid; db_refs.append(b)
+        self._addOidsFor = _addOidsFor
 
     def alias(self, anObj, oidOrObj):
         if not isinstance(oidOrObj, (int, long)):
@@ -48,11 +53,7 @@ class BoundaryOidRegistry(object):
     def add(self, entry):
         oid = entry.oid
         self.db_oid[oid] = entry
-
-        db_ident = self.db_ident
-        db_ident[id(entry.pxy)] = oid
-        if entry.obj is not None:
-            db_ident[id(entry.obj)] = oid
+        self._addOidsFor(oid, entry.pxy, entry.obj)
 
     def remove(self, oid):
         entry = self.lookup(oid)
