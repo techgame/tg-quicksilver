@@ -82,11 +82,6 @@ class TransferWorkspace(WorkspaceBasic):
     def remove(self, oid):
         return self._ws_dst.remove(oid)
 
-    def createExternTable(self, *args, **kw):
-        return self._ws_dst.createExternTable(*args, **kw)
-    def createExternWSView(self, *args, **kw):
-        return self._ws_dst.createExternWSView(*args, **kw)
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def workspaceView(host, wsid=None):

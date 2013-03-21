@@ -61,11 +61,11 @@ class FlatWorkspace(WorkspaceBasic):
                 self._entries.iterkeys())
     def contains(self, oid):
         if oid in self._entries or oid in self._entries_w:
-            return oid
+            return (oid,)
         return False
     def read(self, oid, cols=False):
         if isinstance(oid, tuple): oid = oid[0]
-        ans = self._entries.get(oid)
+        ans = self._entries.get(oid, None)
         return self._entries_w.get(oid, ans)
 
     def commit(self, **kw):
@@ -87,11 +87,6 @@ class FlatWorkspace(WorkspaceBasic):
         ans = self._entries.pop(oid, None)
         self._entries_w.pop(oid, ans)
         return ans
-
-    def createExternTable(self, *args, **kw):
-        raise NotImplementedError('Not supported')
-    def createExternWSView(self, *args, **kw):
-        raise NotImplementedError('Not supported')
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
