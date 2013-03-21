@@ -30,14 +30,17 @@ class FlatMetadataView(MetadataViewBase):
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getAt(self, name, idx=None, default=None):
+        idx = idx or None
         ans = self._meta.get((name,idx), default)
         return self._meta_w.get((name,idx), ans)
 
     def setAt(self, name, idx, value):
+        idx = idx or None
         self._meta.pop((name,idx), None)
         self._meta_w[name,idx] = value
 
     def deleteAt(self, name, idx):
+        idx = idx or None
         ans = self._meta.pop((name,idx), None)
         ans = self._meta_w.pop((name,idx), ans)
         return ans

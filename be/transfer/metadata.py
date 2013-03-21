@@ -24,7 +24,10 @@ class TransferMetadataView(MetadataViewBase):
     def migrate(self):
         src = self._meta_src; dst = self._meta_dst
         for (n,i),v in src.iter(None):
-            dst.setAt(n,i,v)
+            self._migrateEntry(n,i,v, dst)
+
+    def _migrateEntry(self,n,i,v,dst):
+        dst.setAt(n,i,v)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
