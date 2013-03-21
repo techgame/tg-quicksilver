@@ -12,6 +12,7 @@
 
 import sys
 from .errors import OidLookupError
+from .strategy import _oidTypes_
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -88,7 +89,7 @@ class BoundaryStoreReadMixin(object):
         entry = self.reg.lookup(oidOrObj)
 
         if entry is None: 
-            oid = long(oidOrObj)
+            oid = oidOrObj
         else: oid = entry.oid
 
         rec = self.ws.read(oid)
@@ -108,7 +109,7 @@ class BoundaryStoreReadMixin(object):
         """Returns a set of oids referenced by oidOrObj"""
         data = self.raw(oidOrObj, True)
         if data is not None:
-            refs = self.BoundaryRefWalker().findRefs(data['payload'])
+            refs = self.BoundaryRefWalker().findRefs(data['payload'], _oidTypes_)
         else: refs = []
         return refs
 

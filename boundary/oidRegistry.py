@@ -10,6 +10,8 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+from .strategy import _oidTypes_
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -42,7 +44,7 @@ class BoundaryOidRegistry(object):
         self._addOidsFor = _addOidsFor
 
     def alias(self, anObj, oidOrObj):
-        if not isinstance(oidOrObj, (int, long)):
+        if not isinstance(oidOrObj, _oidTypes_):
             if not isinstance(oidOrObj, self.BoundaryEntry):
                 oidOrObj = self.db_ident[id(oidOrObj)]
             else: oidOrObj = oidOrObj.oid
@@ -67,7 +69,7 @@ class BoundaryOidRegistry(object):
         return entry
 
     def lookup(self, oidOrObj, default=None):
-        if not isinstance(oidOrObj, (int, long)):
+        if not isinstance(oidOrObj, _oidTypes_):
             if not isinstance(oidOrObj, self.BoundaryEntry):
                 oidOrObj = self.db_ident.get(id(oidOrObj))
                 if oidOrObj is None:
@@ -80,6 +82,6 @@ class BoundaryOidRegistry(object):
     def get(self, obj, default=None):
         return self.db_ident.get(id(obj), default)
     def __getitem__(self, obj):
-        assert not isinstance(obj, (int, long, float)), "Registry's getitem is for objects only"
+        assert not isinstance(obj, _oidTypes_), "Registry's getitem is for objects only"
         return self.db_ident[id(obj)]
 

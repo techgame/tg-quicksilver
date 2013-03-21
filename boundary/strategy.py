@@ -28,7 +28,7 @@ _fastOutTypes_ = (
     bool, int, long, float, complex,
     tuple, list, set, dict, )
 
-_oidTypes_ = (int, long, basestring)
+_oidTypes_ = (int, long, float, basestring)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

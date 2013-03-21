@@ -15,6 +15,7 @@ from contextlib import contextmanager
 
 from ..mixins import NotStorableMixin
 from .rootProxy import RootProxy, RootProxyRef
+from .strategy import _oidTypes_
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Definitions 
@@ -71,7 +72,7 @@ class BoundaryEntry(NotStorableMixin):
     def setMeta(self, data):
         if data is None: return
 
-        if isinstance(data, (int, long)):
+        if isinstance(data, _oidTypes_):
             self.ghostOid = data
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

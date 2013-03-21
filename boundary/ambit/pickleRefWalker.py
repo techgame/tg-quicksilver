@@ -33,9 +33,9 @@ class TargetStandin(object):
 
 class PickleRefWalker(object):
     Unpickler = Unpickler
-    def findRefs(self, aPickleString, oidType=(int, long)):
+    def findRefs(self, aPickleString, oidTypes):
         refs = self._loadRefs(aPickleString)
-        refs = set(e for e in refs if isinstance(e, oidType))
+        refs = set(e for e in refs if isinstance(e, oidTypes))
         return refs
 
     def _loadRefs(self, aPickleString):
