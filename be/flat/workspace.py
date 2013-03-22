@@ -29,7 +29,7 @@ class FlatWorkspace(WorkspaceBasic):
 
     def __init__(self, dbFilename, *args, **kw):
         self.newOid = MonotonicOids().next
-        self._dbname = os.path.abspath(dbFilename)
+        self.dbname = dbFilename
         self._db, self._db_w = self.initDB(*args, **kw)
         self._initEntries()
 
@@ -45,8 +45,13 @@ class FlatWorkspace(WorkspaceBasic):
         K = self.__class__
         return '<%s.%s>' % (K.__module__, K.__name__)
 
+    _dbname = None
     def getDBName(self): return self._dbname
-    dbname = property(getDBName)
+    def setDBName(self, dbname):
+        if dbname is not None:
+            dbname = os.path.abspath(dbname)
+        self._dbname = dbname
+    dbname = property(getDBName, setDBName)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #~ OID data operations
@@ -80,10 +85,6 @@ class FlatWorkspace(WorkspaceBasic):
         entry = self._entries.pop(oid, {})
         entry.update(data)
         self._entries_w[oid] = entry
-    def postUpdate(self, seqId, **data):
-        raise NotImplementedError('Not supported')
-    def postBackout(self, seqId):
-        raise NotImplementedError('Not supported')
 
     def remove(self, oid):
         ans = self._entries.pop(oid, None)

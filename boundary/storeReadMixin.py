@@ -84,11 +84,18 @@ class BoundaryStoreReadMixin(object):
             raise OidLookupError("No object found for oid: %r" % (oid,), oid)
         return default
 
-    def sync(self, oid, syncOp):
+    def sync(self, syncOp, oid):
         """Re-read the entry from the workspace, if loaded"""
         entry = self.reg.lookup(oid)
         if entry is not None:
             return self._readEntry(entry, syncOp)
+    def syncList(self, syncOp, oidList):
+        """Re-read each entry from the workspace, if loaded"""
+        for oid in oidList: self.sync(syncOp, oid)
+    def bindSyncList(self, syncOp):
+        def syncListUpdate(oidList):
+            self.syncList(syncOp, oidList)
+        return syncListUpdate
 
     def raw(self, oidOrObj, decode=True):
         """Returns the raw database record for the oidOrObj"""

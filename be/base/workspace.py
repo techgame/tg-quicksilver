@@ -20,7 +20,7 @@ from ...mixins import NotStorableMixin
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class WorkspaceBasic(NotStorableMixin):
-    ws = property(lambda: self) # self-reflective property
+    ws = property(lambda self: self) # self-reflective property
     def isMutable(self): return True
 
     @contextlib.contextmanager
@@ -32,7 +32,8 @@ class WorkspaceBasic(NotStorableMixin):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     dbname = property(lambda self: self.getDBName())
     def getDBPath(self):
-        return os.path.dirname(self.getDBName())
+        try: return os.path.dirname(self.getDBName())
+        except Exception: pass
     dbpath = property(getDBPath)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -51,14 +52,51 @@ class WorkspaceBasic(NotStorableMixin):
     def read(self, oid, cols=False):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def write(self, oid, **data):
+        return self.writeEx(oid, data)
+    def writeEx(self, oid, data):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def remove(self, oid):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     def postUpdate(self, seqId, **data):
+        return self.postUpdate(seqId, data)
+    def postUpdateEx(self, seqId, data):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
     def postBackout(self, seqId):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #~ Update & Sync Operations
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def on_updatedOids(self, oidList): pass
+    @contextlib.contextmanager
+    def inUpdate(self, notify=None):
+        self._updatedOids = lst = []
+        yield self
+        del self._updatedOids
+        self.on_updatedOids(lst)
+        if notify is not None:
+            notify(lst)
+
+    def update(self, oid, **data):
+        return self.updateEx(oid, data)
+    def updateEx(self, oid, data):
+        cur = self.read(oid)
+        if cur is None or cur['hash']!=data['hash']:
+            self.writeEx(oid, data)
+            self._updatedOids.append(oid)
+            return True
+        else: return False
+
+    def syncUpdateTo(self, dst, notify=None):
+        return dst.ws.syncUpdateFrom(self, notify)
+    def syncUpdateFrom(self, ws_src, notify=None):
+        ws_src = ws_src.ws
+        with self.inUpdate(notify):
+            for oid in ws_src.allOids():
+                self.updateEx(oid, ws_src.read(oid))
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

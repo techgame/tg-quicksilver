@@ -39,6 +39,9 @@ class TransferWorkspace(WorkspaceBasic):
         data.pop('oid', None)
         dst.write(oid, **data)
 
+    def sync(self, notify=None):
+        self._ws_dst.syncUpdateFrom(self._ws_src, notify)
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getDBName(self):
@@ -73,10 +76,10 @@ class TransferWorkspace(WorkspaceBasic):
     def commit(self, **kw):
         return self._ws_dst.commit(**kw)
 
-    def write(self, oid, **data):
-        return self._ws_dst.write(oid, **data)
-    def postUpdate(self, seqId, **data):
-        return self._ws_dst.postUpdate(seqId, **data)
+    def writeEx(self, oid, data):
+        return self._ws_dst.writeEx(oid, data)
+    def postUpdateEx(self, seqId, data):
+        return self._ws_dst.postUpdateEx(seqId, data)
     def postBackout(self, seqId):
         return self._ws_dst.postBackout(seqId)
     def remove(self, oid):

@@ -284,6 +284,8 @@ class SQLiteWorkspace(WorkspaceCSBase):
     def write(self, oid, **data):
         return self.writeEx(oid, data.items())
     def writeEx(self, oid, dataItems):
+        if hasattr(dataItems, 'iteritems'):
+            dataItems = list(dataItems.iteritems())
         if oid is None:
             oid = self.newOid()
 
@@ -298,7 +300,7 @@ class SQLiteWorkspace(WorkspaceCSBase):
         op = Ops.Remove(self)
         return op.perform(oid)
 
-    def postUpdate(self, seqId, **data):
+    def postUpdateEx(self, seqId, data):
         op = Ops.PostUpdate(self)
         return op.perform(seqId, data)
     def postBackout(self, seqId):
