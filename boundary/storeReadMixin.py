@@ -84,18 +84,19 @@ class BoundaryStoreReadMixin(object):
             raise OidLookupError("No object found for oid: %r" % (oid,), oid)
         return default
 
-    def sync(self, syncOp, oid):
+    def syncUpdate(self, syncOp, oid, rec, rec_prev):
         """Re-read the entry from the workspace, if loaded"""
         entry = self.reg.lookup(oid)
         if entry is not None:
-            return self._readEntry(entry, syncOp)
-    def syncList(self, syncOp, oidList):
+            return self._readEntryEx(entry, rec, rec_prev, syncOp)
+    def syncUpdateMap(self, syncOp, oidEntries):
         """Re-read each entry from the workspace, if loaded"""
-        for oid in oidList: self.sync(syncOp, oid)
-    def bindSyncList(self, syncOp):
-        def syncListUpdate(oidList):
-            self.syncList(syncOp, oidList)
-        return syncListUpdate
+        for oid, (rec, rec_prev) in oidEntries.iteritems():
+            self.syncUpdate(syncOp, oid, rec, rec_prev)
+    def bindSyncUpdateMap(self, syncOp):
+        def doSyncUpdateMap(oidEntries):
+            self.syncUpdateMap(syncOp, oidEntries)
+        return doSyncUpdateMap
 
     def raw(self, oidOrObj, decode=True):
         """Returns the raw database record for the oidOrObj"""
@@ -187,37 +188,45 @@ class BoundaryStoreReadMixin(object):
             self._addDeferredRef(entry)
             return True
 
-    def _readEntry(self, entry, syncOp=None):
+    def _readEntry(self, entry):
         rec = self.ws.read(entry.oid)
+        return self._readEntryEx(entry, rec)
+
+    def _readEntryEx(self, entry, rec, rec_prev=None, syncOp=None):
         if rec is None:
             return False
 
         entry.setMeta(rec['entryMeta'])
-        data = rec['payload']
-        if data is None:
+        payload = rec['payload']
+        if payload is None:
             return False
 
         try:
             with self.ambit(entry) as ambit:
                 self.reg.add(entry)
-                data = self._decodeData(data)
-                try:
-                    obj = ambit.load(data)
+                payload = self._decodeData(payload)
+                try: obj = ambit.load(payload)
                 except Exception, err:
                     r = entry.decodeFailure(err, rec['typeref'])
                     if r is None: raise
                     return r
 
-                else:
+                if syncOp is None:
                     hash = rec['hash']
                     if hash: hash = bytes(hash)
+                    entry.setup(obj, hash)
+                else:
+                    if rec_prev is None: obj_prev = None
+                    elif rec_prev['hash'] != rec['hash']:
+                        payload_prev = self._decodeData(rec_prev['payload'])
+                        try: obj_prev = ambit.load(payload_prev)
+                        except Exception, err: obj_prev = None
+                        self._onRead(rec_prev, payload_prev, entry)
+                    else: obj_prev = obj
+                    entry.syncUpdate(syncOp, obj, obj_prev)
 
-                    if syncOp is None:
-                        entry.setup(obj, hash)
-                    else:
-                        entry.syncUpdate(syncOp, obj, hash)
-                    self._onRead(rec, data, entry)
-                    self.reg.add(entry)
+                self._onRead(rec, payload, entry)
+                self.reg.add(entry)
         except Exception, exc:
             if entry.onReadEntryError(exc, rec['typeref']):
                 raise

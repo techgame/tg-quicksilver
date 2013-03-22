@@ -34,7 +34,7 @@ class _AnExampleEntryObject_(object):
         "to prepare object for hibernation"
     def _dataChangedBoundary_(self, bndEntry, bndCtx):
         "to notify the object that it's data changed compared to what is stored in db"
-    def _syncBoundary_(self, syncOp, other, bndEntry, bndCtx):
+    def _syncBoundary_(self, syncOp, obj_new, obj_prev, bndEntry, bndCtx):
         "to allow the object to perform custom sync operations"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,21 +88,19 @@ class BoundaryEntry(NotStorableMixin):
         if hash is not False:
             self.setHash(hash)
 
-    def syncUpdate(self, syncOp, obj_p, hash_p):
+    def syncUpdate(self, syncOp, obj_new, obj_prev):
+        self.setHash(None)
         for syncBoundary in self._objSend(self.obj, '_syncBoundary_'):
-            self.setHash(None)
-            return syncBoundary(syncOp, obj_p, self, self.context)
+            return syncBoundary(syncOp, obj_new, obj_prev, self, self.context)
 
         if callable(syncOp):
             self.setHash(None)
-            obj = syncOp(self.obj, obj_p, self, self.context)
+            obj = syncOp(self.obj, obj_new, obj_prev, self, self.context)
             if obj is not None: self.setObject(obj)
             return obj
-
-        if obj_p is not False:
-            self.setObject(obj_p)
-        if hash_p is not False:
-            self.setHash(hash_p)
+        else:
+            self.setObject(obj_new)
+            return obj_new
 
     GhostErrorTypes = (AttributeError, ImportError)
     def decodeFailure(self, err, sz_typeref):

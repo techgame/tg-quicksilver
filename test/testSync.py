@@ -22,7 +22,7 @@ import myModule
 def openBoundaryStore(name):
     ws = FlatWorkspace(None)
     bs = BoundaryStore(ws)
-    ws.on_updatedOids = bs.bindSyncList('updated')
+    ws.on_updatedOids = bs.bindSyncUpdateMap('updated')
     return bs
 
 def main():

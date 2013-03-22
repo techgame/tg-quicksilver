@@ -72,20 +72,20 @@ class WorkspaceBasic(NotStorableMixin):
     def on_updatedOids(self, oidList): pass
     @contextlib.contextmanager
     def inUpdate(self, notify=None):
-        self._updatedOids = lst = []
+        self._updatedOids = ddb = {}
         yield self
         del self._updatedOids
-        self.on_updatedOids(lst)
+        self.on_updatedOids(ddb)
         if notify is not None:
-            notify(lst)
+            notify(ddb)
 
     def update(self, oid, **data):
         return self.updateEx(oid, data)
     def updateEx(self, oid, data):
         cur = self.read(oid)
         if cur is None or cur['hash']!=data['hash']:
+            self._updatedOids[oid] = data, cur
             self.writeEx(oid, data)
-            self._updatedOids.append(oid)
             return True
         else: return False
 
