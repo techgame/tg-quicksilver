@@ -20,6 +20,7 @@ from ...mixins import NotStorableMixin
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class WorkspaceBasic(NotStorableMixin):
+    ws = property(lambda: self) # self-reflective property
     def isMutable(self): return True
 
     @contextlib.contextmanager

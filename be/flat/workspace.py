@@ -75,6 +75,8 @@ class FlatWorkspace(WorkspaceBasic):
             self._entries_w.clear()
 
     def write(self, oid, **data):
+        return self.writeEx(oid, data)
+    def writeEx(self, oid, data):
         entry = self._entries.pop(oid, {})
         entry.update(data)
         self._entries_w[oid] = entry
