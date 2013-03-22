@@ -84,6 +84,12 @@ class BoundaryStoreReadMixin(object):
             raise OidLookupError("No object found for oid: %r" % (oid,), oid)
         return default
 
+    def sync(self, oid, syncOp):
+        """Re-read the entry from the workspace, if loaded"""
+        entry = self.reg.lookup(oid)
+        if entry is not None:
+            return self._readEntry(entry, syncOp)
+
     def raw(self, oidOrObj, decode=True):
         """Returns the raw database record for the oidOrObj"""
         entry = self.reg.lookup(oidOrObj)
@@ -168,13 +174,13 @@ class BoundaryStoreReadMixin(object):
         except Exception, exc:
             if entry.onHasEntryError(exc, rec['typeref']):
                 raise
-            return False, None
+            return False
 
         else:
             self._addDeferredRef(entry)
             return True
 
-    def _readEntry(self, entry):
+    def _readEntry(self, entry, syncOp=None):
         rec = self.ws.read(entry.oid)
         if rec is None:
             return False
@@ -199,13 +205,16 @@ class BoundaryStoreReadMixin(object):
                     hash = rec['hash']
                     if hash: hash = bytes(hash)
 
-                    entry.setup(obj, hash)
+                    if syncOp is None:
+                        entry.setup(obj, hash)
+                    else:
+                        entry.syncUpdate(syncOp, obj, hash)
                     self._onRead(rec, data, entry)
                     self.reg.add(entry)
         except Exception, exc:
             if entry.onReadEntryError(exc, rec['typeref']):
                 raise
-            return False, None
+            return False
 
         return True
 
