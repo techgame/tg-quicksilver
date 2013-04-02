@@ -129,6 +129,9 @@ class BoundaryEntry(NotStorableMixin):
         self.hash = hash
         self.dirty = not hash
 
+    def mark(self, dirty=True):
+        self.dirty = dirty
+
     def revId(self):
         return self.store().findRevId(self.oid)
     def nextRevId(self):

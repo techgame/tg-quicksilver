@@ -29,7 +29,7 @@ class BoundaryStoreWriteMixin(object):
         entry = self.reg.lookup(oidOrObj)
         if dirty is not None:
             if entry is not None:
-                entry.dirty = dirty
+                entry.mark(dirty)
         return entry
 
     def add(self, obj, deferred=False):
