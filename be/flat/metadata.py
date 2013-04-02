@@ -10,7 +10,6 @@
 #~ Imports 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-import itertools
 from ..base.metadata import MetadataViewBase
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -23,7 +22,8 @@ class FlatMetadataView(MetadataViewBase):
         self._meta_w = host._db_w.setdefault('meta', {})
 
     def commit(self, **kw):
-        self._meta.update(self._meta_w)
+        for k,v in self._meta_w.iteritems():
+            self._meta.setdefault(k,{}).update(v)
         if kw.get('clear', True):
             self._meta_w.clear()
 
@@ -31,27 +31,36 @@ class FlatMetadataView(MetadataViewBase):
 
     def getAt(self, name, idx=None, default=None):
         idx = idx or None
-        ans = self._meta.get((name,idx), default)
-        return self._meta_w.get((name,idx), ans)
+        ans = self._meta.get(name,{}).get(idx, default)
+        return self._meta_w.get(name, {}).get(idx, ans)
 
     def setAt(self, name, idx, value):
         idx = idx or None
-        self._meta.pop((name,idx), None)
-        self._meta_w[name,idx] = value
+        self._meta.get(name,{}).pop(idx, None)
+        self._meta_w.setdefault(name,{})[idx] = value
 
     def deleteAt(self, name, idx):
         idx = idx or None
-        ans = self._meta.pop((name,idx), None)
-        ans = self._meta_w.pop((name,idx), ans)
+        ans = self._meta.get(name,{}).pop(idx, None)
+        ans = self._meta_w.get(name,{}).pop(idx, ans)
         return ans
 
     def iter(self, name=None):
-        if name is None:
-            return itertools.chain(self._meta.iteritems(),
-                    self._meta_w.iteritems())
+        def iterAt(name):
+            ns = dict()
+            ns.update(self._meta.get(name, ()))
+            ns.update(self._meta_w.get(name, ()))
+            return ns.iteritems()
 
-        byName = lambda (meta): ((i,e) for (n,i),e in meta.iteritems() if n == name)
-        return itertools.chain(byName(self._meta), byName(self._meta_w))
+        if name is None:
+            allNames = set(self._meta.iterkeys())
+            allNames.update(self._meta_w.iterkeys())
+            for name in allNames:
+                for k,v in iterAt(name):
+                    yield k,v
+        else:
+            for k,v in iterAt(name):
+                yield k,v
 
 MetadataView = FlatMetadataView
 def metadataView(host, key=None, **kw):
