@@ -90,17 +90,13 @@ class BoundaryEntry(NotStorableMixin):
 
     def syncUpdate(self, syncOp, obj_new, obj_prev):
         self.setHash(None)
-        for syncBoundary in self._objSend(self.obj, '_syncBoundary_'):
-            return syncBoundary(syncOp, obj_new, obj_prev, self, self.context)
-
         if callable(syncOp):
-            self.setHash(None)
             obj = syncOp(self.obj, obj_new, obj_prev, self, self.context)
-            if obj is not None: self.setObject(obj)
-            return obj
-        else:
-            self.setObject(obj_new)
-            return obj_new
+        else: obj = obj_new
+        for syncBoundary in self._objSend(self.obj, '_syncBoundary_'):
+            obj = syncBoundary(syncOp, obj_new, obj_prev, self, self.context)
+        if obj is not None:
+            self.setObject(obj)
 
     GhostErrorTypes = (AttributeError, ImportError)
     def decodeFailure(self, err, sz_typeref):
