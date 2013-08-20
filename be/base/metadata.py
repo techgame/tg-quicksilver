@@ -40,7 +40,7 @@ class MetadataViewBase(object):
             return value
         else: return r
 
-    def iter(self, name):
+    def iter(self, name=None):
         raise NotImplementedError('Subclass Responsibility: %r' % (self,))
 
     def keyView(self, metaKey=None):

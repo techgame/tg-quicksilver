@@ -57,7 +57,7 @@ class FlatMetadataView(MetadataViewBase):
             allNames.update(self._meta_w.iterkeys())
             for name in allNames:
                 for k,v in iterAt(name):
-                    yield k,v
+                    yield (name,k),v
         else:
             for k,v in iterAt(name):
                 yield k,v
